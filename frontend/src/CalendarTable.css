@@ -1,0 +1,119 @@
+/* Table responsive styling */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  overflow-x: auto;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+}
+
+th {
+  background-color: #f2f2f2;
+  font-size: 16px;
+}
+
+td {
+  vertical-align: top;
+}
+
+.days-container {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(20px, 1fr));
+  gap: 2px;
+}
+
+.day {
+  width: 100%;
+  padding-top: 100%;
+  position: relative;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background-color: #f9f9f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.day::after {
+  content: '';
+  display: block;
+  padding-bottom: 100%;
+}
+
+.day-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day:hover {
+  background-color: #e6f7ff;
+  cursor: pointer;
+}
+
+.highlight {
+  background-color: #d4edda; /* Vert clair pour les périodes de culture */
+}
+
+.tooltip {
+  position: absolute;
+  background-color: #333;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.delete-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.delete-button:hover {
+  color: red;
+}
+
+/* Responsive styling for smaller screens */
+@media screen and (max-width: 768px) {
+  th, td {
+    padding: 5px;
+    font-size: 14px;
+  }
+
+  .day {
+    padding-top: 80%;
+  }
+
+  .day-content {
+    font-size: 10px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  th, td {
+    padding: 4px;
+    font-size: 12px;
+  }
+
+  .day {
+    padding-top: 70%;
+  }
+
+  .day-content {
+    font-size: 9px;
+  }
+}
