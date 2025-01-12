@@ -1,0 +1,35 @@
+# Exclure les environnements virtuels Python
+venv/
+.env
+
+# Exclure les fichiers de base de données SQLite
+*.db
+*.sqlite3
+
+# Exclure les fichiers compilés Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Exclure les fichiers générés par Flask
+instance/
+.mypy_cache/
+.pytest_cache/
+.coverage
+
+# Exclure les dossiers de build et les fichiers node_modules
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.cache
+
+# Exclure les fichiers log
+*.log
+
+# Exclure les fichiers spécifiques aux IDE (VS Code, PyCharm, etc.)
+.vscode/
+.idea/
+
+# Exclure les fichiers système
+.DS_Store
+Thumbs.db
