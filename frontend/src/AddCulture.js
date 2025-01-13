@@ -108,6 +108,52 @@ function AddCulture() {
       });
   };
 
+  // Fonction pour exporter les cultures
+  const handleExport = async () => {
+    try {
+      const response = await axios.get('http://localhost:8001/cultures');
+      const data = JSON.stringify(response.data, null, 2);
+      
+      // Créer un blob et un lien de téléchargement
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'cultures.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Erreur lors de l\'export : ' + error.message);
+    }
+  };
+
+  // Fonction pour importer les cultures
+  const handleImport = async (event) => {
+    try {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const cultures = JSON.parse(e.target.result);
+          await axios.post('http://localhost:8001/cultures/import', cultures);
+          alert('Import réussi !');
+          // Recharger la liste des cultures
+          const response = await axios.get('http://localhost:8001/cultures');
+          setCultures(response.data);
+        } catch (error) {
+          alert('Erreur lors de l\'import : ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    } catch (error) {
+      alert('Erreur lors de la lecture du fichier : ' + error.message);
+    }
+  };
+
   return (
     <div style={{
       maxWidth: '800px',
@@ -383,6 +429,53 @@ function AddCulture() {
           {selectedCultureId ? 'Modifier la culture' : 'Ajouter la culture'}
         </button>
       </form>
+
+      {/* Ajouter les boutons d'import/export en haut à droite */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'flex-end', 
+        gap: '10px',
+        marginBottom: '20px' 
+      }}>
+        <input
+          type="file"
+          accept=".json"
+          onChange={handleImport}
+          style={{ display: 'none' }}
+          id="import-input"
+        />
+        <label
+          htmlFor="import-input"
+          style={{
+            backgroundColor: '#2196F3',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px'
+          }}
+        >
+          📥 Importer
+        </label>
+        <button
+          onClick={handleExport}
+          style={{
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px'
+          }}
+        >
+          📤 Exporter
+        </button>
+      </div>
     </div>
   );
 }

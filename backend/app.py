@@ -2,6 +2,18 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
+import logging
+
+# Configuration du logger
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('backend.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Initialisation de Flask
 app = Flask(__name__)
@@ -25,10 +37,9 @@ class Culture(db.Model):
     date_repiquage = db.Column(db.String(10), nullable=True)
     date_recolte = db.Column(db.String(10), nullable=True)
     commentaire = db.Column(db.String(255), nullable=True)
-    couleur = db.Column(db.String(7), nullable=False) 
+    couleur = db.Column(db.String(7), nullable=False)
     emoji = db.Column(db.String(10), nullable=True)
     temp_emoji = db.Column(db.String(10), nullable=True)
-
 
     def to_dict(self):
         return {
@@ -132,32 +143,37 @@ class PotagerConfig(db.Model):
 # Route pour récupérer toutes les cultures
 @app.route('/cultures', methods=['GET'])
 def get_cultures():
-    # Exclure l'allée de la liste des cultures retournées
     cultures = Culture.query.all()
     return jsonify([culture.to_dict() for culture in cultures])
 
 # Route pour ajouter une culture
 @app.route('/cultures', methods=['POST'])
 def add_culture():
-    data = request.get_json()
-    
-    # Déterminer l'emoji de température en fonction du type de culture
-    temp_emoji = '❄️' if data['type_culture'] == 'pleine terre' else '🌡️'
-    
-    new_culture = Culture(
-        nom=data['nom'],
-        date_semis=data['date_semis'],
-        type_culture=data['type_culture'],
-        date_repiquage=data.get('date_repiquage'),
-        date_recolte=data.get('date_recolte'),
-        commentaire=data.get('commentaire'),
-        emoji=data.get('emoji'),
-        couleur=data.get('couleur'),
-        temp_emoji=temp_emoji
-    )
-    db.session.add(new_culture)
-    db.session.commit()
-    return jsonify({"message": "Culture ajoutée avec succès !"}), 201
+    try:
+        data = request.get_json()
+        logger.info(f"Tentative d'ajout d'une culture : {data}")
+        
+        # Déterminer l'emoji de température en fonction du type de culture
+        temp_emoji = '❄️' if data['type_culture'] == 'pleine terre' else '��️'
+        
+        new_culture = Culture(
+            nom=data['nom'],
+            date_semis=data['date_semis'],
+            type_culture=data['type_culture'],
+            date_repiquage=data.get('date_repiquage'),
+            date_recolte=data.get('date_recolte'),
+            commentaire=data.get('commentaire'),
+            emoji=data.get('emoji'),
+            couleur=data.get('couleur', '#ffffff'),
+            temp_emoji=temp_emoji
+        )
+        db.session.add(new_culture)
+        db.session.commit()
+        return jsonify({"message": "Culture ajoutée avec succès !"}), 201
+
+    except Exception as e:
+        logger.error(f"Erreur lors de l'ajout d'une culture : {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # Route pour supprimer une culture par ID
 @app.route('/cultures/<int:id>', methods=['DELETE'])
@@ -475,10 +491,8 @@ def update_culture(id):
         culture = Culture.query.get_or_404(id)
         data = request.get_json()
         
-        # Mettre à jour l'emoji de température en fonction du type de culture
         temp_emoji = '❄️' if data['type_culture'] == 'pleine terre' else '🌡️'
         
-        # Mise à jour des champs
         culture.nom = data['nom']
         culture.date_semis = data['date_semis']
         culture.type_culture = data['type_culture']
@@ -523,6 +537,73 @@ def get_version(id):
     response_data['parcelles'] = parcelles_data
     
     return jsonify(response_data)
+
+# Ajouter cette nouvelle route pour l'import des cultures
+@app.route('/cultures/import', methods=['POST'])
+def import_cultures():
+    try:
+        cultures_data = request.get_json()
+        
+        # Supprimer toutes les cultures existantes si nécessaire
+        # Culture.query.delete()
+        
+        for culture_data in cultures_data:
+            # Retirer l'ID pour éviter les conflits
+            if 'id' in culture_data:
+                del culture_data['id']
+                
+            culture = Culture(**culture_data)
+            db.session.add(culture)
+            
+        db.session.commit()
+        return jsonify({"message": "Cultures importées avec succès !"}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# Après la route GET /versions/<int:id>
+
+@app.route('/versions/export/<int:id>', methods=['GET'])
+def export_version(id):
+    try:
+        version = Version.query.get_or_404(id)
+        version_data = version.to_dict()
+        
+        # Nettoyer les données pour l'export
+        if 'created_at' in version_data:
+            version_data['created_at'] = version_data['created_at'].isoformat()
+            
+        return jsonify(version_data), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/versions/import', methods=['POST'])
+def import_version():
+    try:
+        data = request.get_json()
+        
+        # Mettre à jour toutes les versions existantes comme non courantes
+        Version.query.update({Version.is_current: False})
+        
+        # Créer la nouvelle version
+        new_version = Version(
+            name=data.get('name', 'Version importée'),
+            parcelles=data['parcelles'],
+            parcelle_positions=data['parcelle_positions'],
+            parcelle_cultures=data['parcelle_cultures'],
+            is_current=True
+        )
+        
+        db.session.add(new_version)
+        db.session.commit()
+        
+        return jsonify({"message": "Version importée avec succès!", "id": new_version.id}), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 # Création de la base de données
 if __name__ == "__main__":

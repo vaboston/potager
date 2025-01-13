@@ -3,7 +3,7 @@ import axios from 'axios';
 import './App.css';
 
 function GardenPlanner() {
-  const [selectedCrop, setSelectedCrop] = useState('');
+  const [selectedCrop, setSelectedCrop] = useState(null);
   const [crops, setCrops] = useState([]);
   const [gridSize, setGridSize] = useState({ rows: 5, cols: 5 });
   const [grid, setGrid] = useState(Array(gridSize.rows * gridSize.cols).fill(''));
@@ -19,6 +19,7 @@ function GardenPlanner() {
   const [versionName, setVersionName] = useState('');
   const [parcelleGrids, setParcelleGrids] = useState({});
   const [currentVersion, setCurrentVersion] = useState(null);
+  const [hoverTooltip, setHoverTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
 
   // Gestion du changement de taille
   const handleSizeChange = (type, value) => {
@@ -141,34 +142,51 @@ function GardenPlanner() {
 
   const handleCellClick = async (index) => {
     if (!selectedParcelle) {
-        alert('Veuillez sélectionner une parcelle');
-        return;
+      alert('Veuillez sélectionner une parcelle');
+      return;
     }
 
     const row = Math.floor(index / gridSize.cols);
     const col = index % gridSize.cols;
     
     try {
-        // Si la case contient déjà une culture, on l'efface
-        const currentEmoji = grid[index];
-        const newEmoji = currentEmoji ? '' : selectedCrop;
+      const currentEmoji = grid[index];
+      const newEmoji = currentEmoji ? '' : selectedCrop?.emoji;
 
-        const response = await axios.post('http://localhost:8001/parcelles', {
-            parcelle_id: parseInt(selectedParcelle),
-            row: row,
-            col: col,
-            culture_emoji: newEmoji
-        });
+      const response = await axios.post('http://localhost:8001/parcelles', {
+        parcelle_id: parseInt(selectedParcelle),
+        row: row,
+        col: col,
+        culture_emoji: newEmoji,
+        culture_id: selectedCrop?.id
+      });
 
-        if (response.data.message) {
-            const newGrid = [...grid];
-            newGrid[index] = newEmoji;
-            setGrid(newGrid);
-        }
+      if (response.data.message) {
+        const newGrid = [...grid];
+        newGrid[index] = newEmoji;
+        setGrid(newGrid);
+      }
     } catch (error) {
-        console.error('Erreur lors de la mise à jour:', error);
-        alert('Erreur lors de la mise à jour de la culture');
+      console.error('Erreur lors de la mise à jour de la parcelle:', error);
     }
+  };
+
+  const handleCellHover = (e, cell) => {
+    if (cell) {
+      const culture = crops.find(c => c.emoji === cell);
+      if (culture) {
+        setHoverTooltip({
+          visible: true,
+          text: culture.nom,
+          x: e.clientX + 10,
+          y: e.clientY + 10
+        });
+      }
+    }
+  };
+
+  const handleCellLeave = () => {
+    setHoverTooltip({ visible: false, text: '', x: 0, y: 0 });
   };
 
   const handleCreateParcelle = async () => {
@@ -323,55 +341,88 @@ function GardenPlanner() {
         overflowY: 'auto'
       }}>
         <h2>Versions sauvegardées</h2>
+        
+        {/* Boutons d'import/export en haut */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '10px', 
+          marginBottom: '20px',
+          justifyContent: 'center' 
+        }}>
+          <input
+            type="file"
+            id="importVersion"
+            style={{ display: 'none' }}
+            onChange={handleImportVersion}
+            accept=".json"
+          />
+          <label
+            htmlFor="importVersion"
+            style={{
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            📥 Importer une version
+          </label>
+        </div>
+
+        {/* Liste des versions avec bouton d'export pour chacune */}
         {versions.map((version) => {
           const isCurrentVersion = version.id === lastSelectedVersion;
           return (
-            <div
-              key={version.id}
-              style={{
-                padding: '10px',
-                margin: '10px 0',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                backgroundColor: isCurrentVersion ? '#e8f5e9' : 'white',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-              onClick={() => onSelect(version)}
-            >
-              <div>
-                <strong>{version.name || 'Sans nom'}</strong>
-                <div style={{ fontSize: '0.8em', color: '#666' }}>
-                  Créée le {new Date(version.created_at).toLocaleString()}
-                </div>
-                {isCurrentVersion && (
-                  <div style={{ 
-                    marginTop: '5px',
-                    color: '#4CAF50',
-                    fontWeight: 'bold',
-                    fontSize: '0.9em'
-                  }}>
-                    Version courante ✓
-                  </div>
-                )}
+            <div key={version.id} style={{
+              padding: '10px',
+              margin: '10px 0',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              backgroundColor: isCurrentVersion ? '#e8f5e9' : 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span onClick={() => onSelect(version)} style={{ cursor: 'pointer', flex: 1 }}>
+                  {version.name} {isCurrentVersion && '(Version actuelle)'}
+                  <br />
+                  <small>{new Date(version.created_at).toLocaleString()}</small>
+                </span>
+                <button
+                  onClick={() => handleExportVersion(version.id)}
+                  style={{
+                    backgroundColor: '#2196F3',
+                    color: 'white',
+                    border: 'none',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    marginLeft: '10px'
+                  }}
+                >
+                  📤
+                </button>
               </div>
             </div>
           );
         })}
-        <button 
-          onClick={onClose} 
-          style={{ 
-            marginTop: '20px',
-            padding: '8px 16px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
+        
+        {/* Bouton fermer existant */}
+        <button onClick={onClose} style={{ 
+          marginTop: '20px',
+          padding: '8px 16px',
+          backgroundColor: '#4CAF50',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}>
           Fermer
         </button>
       </div>
@@ -425,6 +476,50 @@ function GardenPlanner() {
         console.error('Erreur lors de la suppression:', error);
         alert('Erreur lors de la suppression de la parcelle');
       }
+    }
+  };
+
+  const handleExportVersion = async (versionId) => {
+    try {
+      const response = await axios.get(`http://localhost:8001/versions/export/${versionId}`);
+      const data = JSON.stringify(response.data, null, 2);
+      
+      // Créer un blob et un lien de téléchargement
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `version_${versionId}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Erreur lors de l\'export : ' + error.message);
+    }
+  };
+
+  const handleImportVersion = async (event) => {
+    try {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const versionData = JSON.parse(e.target.result);
+          await axios.post('http://localhost:8001/versions/import', versionData);
+          alert('Version importée avec succès !');
+          // Recharger la liste des versions
+          const response = await axios.get('http://localhost:8001/versions');
+          setVersions(response.data);
+        } catch (error) {
+          alert('Erreur lors de l\'import : ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    } catch (error) {
+      alert('Erreur lors de la lecture du fichier : ' + error.message);
     }
   };
 
@@ -522,14 +617,18 @@ function GardenPlanner() {
               {crops.map((crop) => (
                 <button
                   key={crop.id}
-                  onClick={() => setSelectedCrop(crop.emoji)}
+                  onClick={() => setSelectedCrop({
+                    id: crop.id,
+                    emoji: crop.emoji,
+                    nom: crop.nom
+                  })}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     padding: '4px 8px',
-                    border: selectedCrop === crop.emoji ? '2px solid #4CAF50' : '1px solid #ddd',
+                    border: selectedCrop?.id === crop.id ? '2px solid #4CAF50' : '1px solid #ddd',
                     borderRadius: '4px',
-                    backgroundColor: selectedCrop === crop.emoji ? '#e8f5e9' : 'white',
+                    backgroundColor: selectedCrop?.id === crop.id ? '#e8f5e9' : 'white',
                     cursor: 'pointer',
                     width: 'fit-content',
                     textAlign: 'left',
@@ -622,6 +721,8 @@ function GardenPlanner() {
                 key={index} 
                 className="simple-cell"
                 onClick={() => handleCellClick(index)}
+                onMouseEnter={(e) => handleCellHover(e, cell)}
+                onMouseLeave={handleCellLeave}
                 style={{ 
                   fontSize: '24px',
                   width: '50px',
@@ -848,6 +949,25 @@ function GardenPlanner() {
           onClose={() => setShowVersionsModal(false)}
           onSelect={handleVersionSelect}
         />
+      )}
+
+      {hoverTooltip.visible && (
+        <div
+          style={{
+            position: 'fixed',
+            top: hoverTooltip.y,
+            left: hoverTooltip.x,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            zIndex: 1000,
+            pointerEvents: 'none'
+          }}
+        >
+          {hoverTooltip.text}
+        </div>
       )}
     </div>
   );
