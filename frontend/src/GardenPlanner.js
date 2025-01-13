@@ -31,7 +31,7 @@ function GardenPlanner() {
 
   // Chargement des cultures et des parcelles
   useEffect(() => {
-    axios.get('http://localhost:8001/cultures')
+    axios.get('http://localhost:8001/cultures/popular')
       .then(response => setCrops(response.data))
       .catch(error => console.error('Erreur chargement cultures:', error));
 
@@ -417,8 +417,129 @@ function GardenPlanner() {
 
   return (
     <div style={{ padding: '20px', display: 'flex', gap: '20px' }}>
-      {/* Partie gauche avec la grille et les contrôles */}
-      <div style={{ flex: '1' }}>
+      {/* Colonne de gauche pour les cultures */}
+      <div style={{ width: '250px' }}>
+        <div className="cultures-list" style={{
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          padding: '10px',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          backgroundColor: 'white',
+          position: 'sticky',
+          top: '20px'
+        }}>
+          {/* Section création de parcelle */}
+          <h3>Créer une parcelle</h3>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            marginBottom: '20px',
+            padding: '10px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px'
+          }}>
+            <input
+              type="text"
+              value={parcelleName}
+              onChange={(e) => setParcelleName(e.target.value)}
+              placeholder="Nom de la parcelle"
+              style={{
+                padding: '4px 8px',
+                borderRadius: '4px',
+                border: '1px solid #ddd'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <input
+                type="number"
+                value={gridSize.rows}
+                onChange={(e) => handleSizeChange('rows', e.target.value)}
+                placeholder="Lignes"
+                min="1"
+                max="20"
+                style={{
+                  width: '50%',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd'
+                }}
+              />
+              <input
+                type="number"
+                value={gridSize.cols}
+                onChange={(e) => handleSizeChange('cols', e.target.value)}
+                placeholder="Colonnes"
+                min="1"
+                max="20"
+                style={{
+                  width: '50%',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd'
+                }}
+              />
+            </div>
+            <button 
+              onClick={handleCreateParcelle}
+              disabled={!parcelleName || gridSize.rows * gridSize.cols <= 0}
+              style={{
+                padding: '8px',
+                backgroundColor: !parcelleName || gridSize.rows * gridSize.cols <= 0 ? '#cccccc' : '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: !parcelleName || gridSize.rows * gridSize.cols <= 0 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Créer une parcelle
+            </button>
+          </div>
+
+          {/* Section liste des cultures */}
+          <h3>Cultures disponibles</h3>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            {crops.map((crop) => (
+              <button
+                key={crop.id}
+                onClick={() => setSelectedCrop(crop.emoji)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 8px',
+                  border: selectedCrop === crop.emoji ? '2px solid #4CAF50' : '1px solid #ddd',
+                  borderRadius: '4px',
+                  backgroundColor: selectedCrop === crop.emoji ? '#e8f5e9' : 'white',
+                  cursor: 'pointer',
+                  width: 'fit-content',
+                  textAlign: 'left',
+                  margin: '0'
+                }}
+              >
+                <span style={{ marginRight: '8px', fontSize: '1.2em' }}>{crop.emoji}</span>
+                <div style={{ display: 'inline-block' }}>
+                  <div style={{ fontWeight: 'bold', display: 'inline' }}>{crop.nom}</div>
+                  <small style={{ 
+                    color: '#666',
+                    marginLeft: '8px',
+                    display: 'inline'
+                  }}>
+                    ({crop.usage_count || 0})
+                  </small>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Colonne centrale avec la grille et les contrôles */}
+      <div style={{ flex: '1', maxWidth: '800px' }}>
         <h1>Organisation du Potager</h1>
         
         {/* Boutons pour gérer les versions */}
@@ -426,7 +547,7 @@ function GardenPlanner() {
           <button 
             onClick={handleDeleteParcelle} 
             style={{ 
-              fontSize: '20px',
+              fontSize: '14px',
               backgroundColor: selectedParcelle ? '#ff4444' : '#cccccc',
               color: 'white',
               border: 'none',
@@ -438,59 +559,29 @@ function GardenPlanner() {
           >
             ❌ Supp. parcelle
           </button>
-          <button onClick={createVersion} style={{ fontSize: '20px' }}>
+          <button 
+            onClick={createVersion} 
+            style={{ 
+              fontSize: '14px',
+              padding: '5px 10px',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
             🔄 Créer une version
           </button>
-          <button onClick={() => setShowVersionsModal(true)} style={{ fontSize: '20px' }}>
-            📜 Liste des versions
-          </button>
-        </div>
-
-        {/* Création de nouvelle parcelle */}
-        <div className="parcelle-creation">
-          <input
-            type="text"
-            value={parcelleName}
-            onChange={(e) => setParcelleName(e.target.value)}
-            placeholder="Nom de la parcelle"
-          />
-          <input
-            type="number"
-            value={gridSize.rows}
-            onChange={(e) => handleSizeChange('rows', e.target.value)}
-            placeholder="Nombre de lignes"
-            min="1"
-            max="20"
-          />
-          <input
-            type="number"
-            value={gridSize.cols}
-            onChange={(e) => handleSizeChange('cols', e.target.value)}
-            placeholder="Nombre de colonnes"
-            min="1"
-            max="20"
-          />
           <button 
-            onClick={handleCreateParcelle}
-            disabled={!parcelleName || gridSize.rows * gridSize.cols <= 0}
+            onClick={() => setShowVersionsModal(true)} 
+            style={{ 
+              fontSize: '14px',
+              padding: '5px 10px',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
           >
-            Créer une parcelle
+            📋 Liste des versions
           </button>
         </div>
-
-        {/* Sélection de culture */}
-        <select 
-          value={selectedCrop} 
-          onChange={(e) => setSelectedCrop(e.target.value)}
-          className="crop-select"
-        >
-          <option value="">Sélectionner une culture</option>
-          {crops.map((crop) => (
-            <option key={crop.id} value={crop.emoji}>
-              {crop.nom} {crop.emoji}
-            </option>
-          ))}
-        </select>
 
         {/* Grille */}
         <div 
@@ -575,14 +666,7 @@ function GardenPlanner() {
       </div>
 
       {/* Nouvelle partie droite avec potager miniature */}
-      <div style={{ 
-        width: `${Math.max(400, potagerSize.cols * 40)}px`,
-        padding: '20px',
-        backgroundColor: '#f5f5f5',
-        borderRadius: '8px',
-        marginTop: '60px',
-        overflowX: 'auto'
-      }}>
+      <div style={{ width: '400px' }}>
         <h2 style={{ marginTop: '0', marginBottom: '20px' }}>Vue d'ensemble du potager</h2>
         
         {/* Contrôles de taille du potager */}

@@ -415,6 +415,40 @@ def delete_parcelle(id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# Ajouter cette nouvelle route après les autres routes
+@app.route('/cultures/popular', methods=['GET'])
+def get_popular_cultures():
+    try:
+        # Sous-requête pour compter les occurrences de chaque emoji dans les parcelles
+        culture_counts = db.session.query(
+            Parcelle.culture_emoji,
+            db.func.count(Parcelle.culture_emoji).label('count')
+        ).group_by(Parcelle.culture_emoji).subquery()
+
+        # Joindre avec la table Culture et trier par popularité
+        popular_cultures = db.session.query(
+            Culture,
+            db.func.coalesce(culture_counts.c.count, 0).label('usage_count')
+        ).outerjoin(
+            culture_counts,
+            Culture.emoji == culture_counts.c.culture_emoji
+        ).order_by(
+            db.desc('usage_count'),
+            Culture.nom
+        ).all()
+
+        # Formater les résultats
+        result = [{
+            **culture.to_dict(),
+            'usage_count': count
+        } for culture, count in popular_cultures]
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"Erreur: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # Création de la base de données
 if __name__ == "__main__":
     with app.app_context():
