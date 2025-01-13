@@ -91,6 +91,28 @@ class ParcellePosition(db.Model):
             'position_y': self.position_y
         }
 
+# Modèle pour les versions du potager
+class Version(db.Model):
+    __tablename__ = 'version'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=True)
+    parcelles = db.Column(db.PickleType, nullable=False)
+    parcelle_positions = db.Column(db.PickleType, nullable=False)
+    parcelle_cultures = db.Column(db.PickleType, nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    is_current = db.Column(db.Boolean, default=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'parcelles': self.parcelles,
+            'parcelle_positions': self.parcelle_positions,
+            'parcelle_cultures': self.parcelle_cultures,
+            'created_at': self.created_at,
+            'is_current': self.is_current
+        }
+
 # Route pour récupérer toutes les cultures
 @app.route('/cultures', methods=['GET'])
 def get_cultures():
@@ -236,6 +258,32 @@ def update_parcelle_position():
 def get_parcelle_positions():
     positions = ParcellePosition.query.all()
     return jsonify([pos.to_dict() for pos in positions])
+
+# Route pour créer une version
+@app.route('/versions', methods=['POST'])
+def create_version():
+    data = request.get_json()
+    
+    # Mettre à jour toutes les versions existantes comme non courantes
+    Version.query.update({Version.is_current: False})
+    db.session.commit()  # Commit immédiat pour éviter les conflits
+    
+    new_version = Version(
+        name=data.get('name'),
+        parcelles=data['parcelles'],
+        parcelle_positions=data['parcellePositions'],
+        parcelle_cultures=data.get('parcelleCultures', {}),
+        is_current=True  # La nouvelle version est toujours courante
+    )
+    db.session.add(new_version)
+    db.session.commit()
+    return jsonify(new_version.to_dict()), 201
+
+# Route pour récupérer toutes les versions
+@app.route('/versions', methods=['GET'])
+def get_versions():
+    versions = Version.query.order_by(Version.created_at.desc()).all()
+    return jsonify([version.to_dict() for version in versions])
 
 # Création de la base de données
 if __name__ == "__main__":

@@ -13,6 +13,10 @@ function GardenPlanner() {
   const [potagerSize, setPotagerSize] = useState({ rows: 10, cols: 10 });
   const [parcellePositions, setParcellePositions] = useState({});
   const [cultures, setCultures] = useState([]);
+  const [versions, setVersions] = useState([]);
+  const [showVersionsModal, setShowVersionsModal] = useState(false);
+  const [lastSelectedVersion, setLastSelectedVersion] = useState(null);
+  const [versionName, setVersionName] = useState('');
 
   // Gestion du changement de taille
   const handleSizeChange = (type, value) => {
@@ -61,6 +65,13 @@ function GardenPlanner() {
     axios.get('http://localhost:8001/cultures')
       .then(response => setCultures(response.data))
       .catch(error => console.error('Erreur chargement cultures:', error));
+  }, []);
+
+  // Charger les versions au démarrage
+  useEffect(() => {
+    axios.get('http://localhost:8001/versions')
+      .then(response => setVersions(response.data))
+      .catch(error => console.error('Erreur chargement versions:', error));
   }, []);
 
   const handleCellClick = async (index) => {
@@ -184,12 +195,138 @@ function GardenPlanner() {
     return deadlines.sort((a, b) => a.date - b.date);
   };
 
+  // Fonction pour créer une nouvelle version
+  const createVersion = () => {
+    // Demander le nom de la version via un prompt
+    const name = window.prompt("Donnez un nom à cette version :", "");
+    if (name === null) return; // L'utilisateur a annulé
+
+    const parcelleCultures = {};
+    parcelles.forEach(parcelle => {
+      const cultures = grid.filter((cell, index) => {
+        const row = Math.floor(index / gridSize.cols);
+        const col = index % gridSize.cols;
+        return cell && row < parcelle.rows && col < parcelle.cols;
+      });
+      parcelleCultures[parcelle.id] = cultures;
+    });
+
+    axios.post('http://localhost:8001/versions', {
+      name: name,
+      parcelles,
+      parcellePositions,
+      parcelleCultures
+    })
+      .then(response => {
+        alert('Version créée avec succès !');
+        setVersions([...versions, response.data]);
+      })
+      .catch(error => console.error('Erreur création version:', error));
+  };
+
+  // Composant Modal pour les versions
+  const VersionsModal = ({ versions, onClose, onSelect }) => (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        maxWidth: '500px',
+        width: '90%',
+        maxHeight: '80vh',
+        overflowY: 'auto'
+      }}>
+        <h2>Versions sauvegardées</h2>
+        {versions.map((version) => (
+          <div
+            key={version.id}
+            style={{
+              padding: '10px',
+              margin: '10px 0',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              backgroundColor: lastSelectedVersion === version.id ? '#e8f5e9' : 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+            onClick={() => onSelect(version)}
+          >
+            <div>
+              <strong>{version.name || 'Sans nom'}</strong>
+              <div style={{ fontSize: '0.8em', color: '#666' }}>
+                Créée le {new Date(version.created_at).toLocaleString()}
+              </div>
+              {lastSelectedVersion === version.id && (
+                <span style={{ 
+                  marginLeft: '10px',
+                  color: '#4CAF50',
+                  fontWeight: 'bold'
+                }}>
+                  (Version courante)
+                </span>
+              )}
+              {version.is_current && (
+                <span style={{ marginLeft: '10px' }}>⏰</span>
+              )}
+            </div>
+          </div>
+        ))}
+        <button onClick={onClose} style={{ marginTop: '20px' }}>Fermer</button>
+      </div>
+    </div>
+  );
+
+  const handleVersionSelect = (version) => {
+    setParcelles(version.parcelles);
+    setParcellePositions(version.parcelle_positions);
+    
+    // Restaurer les cultures de chaque parcelle
+    const newGrid = Array(gridSize.rows * gridSize.cols).fill('');
+    Object.entries(version.parcelle_cultures).forEach(([parcelleId, cultures]) => {
+      cultures.forEach((culture, index) => {
+        if (culture) {
+          newGrid[index] = culture;
+        }
+      });
+    });
+    setGrid(newGrid);
+    
+    setLastSelectedVersion(version.id);
+    setShowVersionsModal(false);
+  };
+
   return (
     <div style={{ padding: '20px', display: 'flex', gap: '20px' }}>
       {/* Partie gauche avec la grille et les contrôles */}
       <div style={{ flex: '1' }}>
         <h1>Organisation du Potager</h1>
         
+        {/* Boutons pour gérer les versions */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button onClick={createVersion} style={{ fontSize: '20px' }}>
+            🔄 Créer une version
+          </button>
+          <button 
+            onClick={() => setShowVersionsModal(true)} 
+            style={{ fontSize: '20px' }}
+          >
+            📜 Liste des versions
+          </button>
+        </div>
+
         {/* Création de nouvelle parcelle */}
         <div className="parcelle-creation">
           <input
@@ -452,6 +589,14 @@ function GardenPlanner() {
           </div>
         </div>
       </div>
+
+      {showVersionsModal && (
+        <VersionsModal
+          versions={versions}
+          onClose={() => setShowVersionsModal(false)}
+          onSelect={handleVersionSelect}
+        />
+      )}
     </div>
   );
 }
