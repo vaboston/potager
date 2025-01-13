@@ -12,6 +12,7 @@ function GardenPlanner() {
   const [selectedParcelle, setSelectedParcelle] = useState(null);
   const [potagerSize, setPotagerSize] = useState({ rows: 10, cols: 10 });
   const [parcellePositions, setParcellePositions] = useState({});
+  const [cultures, setCultures] = useState([]);
 
   // Gestion du changement de taille
   const handleSizeChange = (type, value) => {
@@ -53,6 +54,13 @@ function GardenPlanner() {
     };
 
     loadPositions();
+  }, []);
+
+  // Charger les cultures au démarrage
+  useEffect(() => {
+    axios.get('http://localhost:8001/cultures')
+      .then(response => setCultures(response.data))
+      .catch(error => console.error('Erreur chargement cultures:', error));
   }, []);
 
   const handleCellClick = async (index) => {
@@ -144,6 +152,38 @@ function GardenPlanner() {
     }
   };
 
+  // Fonction pour calculer les échéances des 15 prochains jours
+  const getUpcomingDeadlines = () => {
+    const today = new Date();
+    const in15Days = new Date();
+    in15Days.setDate(today.getDate() + 15);
+    
+    const deadlines = [];
+    
+    cultures.forEach(culture => {
+      const dates = [
+        { date: new Date(culture.date_semis), type: 'semis', emoji: '🌱' },
+        { date: new Date(culture.date_repiquage), type: 'repiquage', emoji: '🌿' },
+        { date: new Date(culture.date_recolte), type: 'récolte', emoji: '🥕' }
+      ];
+      
+      dates.forEach(({ date, type, emoji }) => {
+        if (!isNaN(date.getTime()) && date >= today && date <= in15Days) {
+          const daysLeft = Math.ceil((date - today) / (1000 * 60 * 60 * 24));
+          deadlines.push({
+            culture: culture.nom,
+            date,
+            type,
+            emoji,
+            daysLeft
+          });
+        }
+      });
+    });
+    
+    return deadlines.sort((a, b) => a.date - b.date);
+  };
+
   return (
     <div style={{ padding: '20px', display: 'flex', gap: '20px' }}>
       {/* Partie gauche avec la grille et les contrôles */}
@@ -224,15 +264,68 @@ function GardenPlanner() {
             </div>
           ))}
         </div>
+
+        {/* Nouveau composant de planning */}
+        <div style={{
+          marginTop: '30px',
+          padding: '20px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ marginTop: '0', marginBottom: '15px' }}>
+            Échéances des 15 prochains jours
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {getUpcomingDeadlines().map((deadline, index) => (
+              <div 
+                key={index}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px',
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '20px' }}>{deadline.emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold' }}>{deadline.culture}</div>
+                  <div style={{ fontSize: '0.9em', color: '#666' }}>
+                    {deadline.type} le {deadline.date.toLocaleDateString()}
+                  </div>
+                </div>
+                <div style={{
+                  backgroundColor: deadline.daysLeft <= 3 ? '#ff4444' : '#4CAF50',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '0.8em'
+                }}>
+                  {deadline.daysLeft === 0 ? "Aujourd'hui" : 
+                   deadline.daysLeft === 1 ? "Demain" :
+                   `Dans ${deadline.daysLeft} jours`}
+                </div>
+              </div>
+            ))}
+            {getUpcomingDeadlines().length === 0 && (
+              <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
+                Aucune échéance dans les 15 prochains jours
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Nouvelle partie droite avec potager miniature */}
       <div style={{ 
-        width: '400px', 
+        width: `${Math.max(400, potagerSize.cols * 40)}px`,
         padding: '20px',
         backgroundColor: '#f5f5f5',
         borderRadius: '8px',
-        marginTop: '60px'
+        marginTop: '60px',
+        overflowX: 'auto'
       }}>
         <h2 style={{ marginTop: '0', marginBottom: '20px' }}>Vue d'ensemble du potager</h2>
         
@@ -261,11 +354,12 @@ function GardenPlanner() {
         {/* Grille du potager avec parcelles miniatures */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${potagerSize.cols}, 1fr)`,
+          gridTemplateColumns: `repeat(${potagerSize.cols}, 40px)`,
           gap: '2px',
           backgroundColor: '#ddd',
           padding: '4px',
-          borderRadius: '4px'
+          borderRadius: '4px',
+          margin: '0 auto'
         }}>
           {Array.from({ length: potagerSize.rows * potagerSize.cols }).map((_, index) => {
             const row = Math.floor(index / potagerSize.cols);
