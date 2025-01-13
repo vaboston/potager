@@ -6,7 +6,7 @@ function GardenPlanner() {
   const [selectedCrop, setSelectedCrop] = useState('');
   const [crops, setCrops] = useState([]);
   const [gridSize, setGridSize] = useState({ rows: 5, cols: 5 });
-  const [grid, setGrid] = useState([]);
+  const [grid, setGrid] = useState(Array(gridSize.rows * gridSize.cols).fill(''));
   const [parcelleName, setParcelleName] = useState('');
   const [parcelles, setParcelles] = useState([]);
   const [selectedParcelle, setSelectedParcelle] = useState(null);
@@ -17,6 +17,7 @@ function GardenPlanner() {
   const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [lastSelectedVersion, setLastSelectedVersion] = useState(null);
   const [versionName, setVersionName] = useState('');
+  const [parcelleGrids, setParcelleGrids] = useState({});
 
   // Gestion du changement de taille
   const handleSizeChange = (type, value) => {
@@ -74,6 +75,30 @@ function GardenPlanner() {
       .catch(error => console.error('Erreur chargement versions:', error));
   }, []);
 
+  // Charger les données initiales des parcelles
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // Charger toutes les parcelles
+        const parcellesResponse = await axios.get('http://localhost:8001/parcelles');
+        setParcelles(parcellesResponse.data);
+        
+        // Pour chaque parcelle, charger sa grille
+        for (const parcelle of parcellesResponse.data) {
+          const response = await axios.get(`http://localhost:8001/parcelles/${parcelle.id}`);
+          setParcelleGrids(prev => ({
+            ...prev,
+            [parcelle.id]: response.data.grid
+          }));
+        }
+      } catch (error) {
+        console.error('Erreur chargement données initiales:', error);
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
   const handleCellClick = async (index) => {
     if (selectedCrop && selectedParcelle) {
       const row = Math.floor(index / gridSize.cols);
@@ -127,14 +152,16 @@ function GardenPlanner() {
       const response = await axios.get(`http://localhost:8001/parcelles/${id}`);
       console.log('Données reçues:', response.data);
       
-      // Mettre à jour la taille de la grille
       setGridSize({
         rows: response.data.rows,
         cols: response.data.cols
       });
 
-      // Utiliser directement la grille reçue
       setGrid(response.data.grid);
+      setParcelleGrids(prev => ({
+        ...prev,
+        [id]: response.data.grid
+      }));
 
     } catch (error) {
       console.error('Erreur chargement parcelle:', error);
@@ -517,13 +544,13 @@ function GardenPlanner() {
                 style={{
                   width: '30px',
                   height: '30px',
-                  backgroundColor: parcelle ? (selectedParcelle === parcelle.id ? '#4CAF50' : '#fff') : '#f0f0f0',
+                  backgroundColor: parcelle ? (selectedParcelle === parcelle.id ? '#4CAF50' : '#c8e6c9') : '#f0f0f0',
                   border: '1px solid #ccc',
                   cursor: parcelle ? 'move' : 'default',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '10px',
+                  fontSize: '16px',
                   userSelect: 'none'
                 }}
                 draggable={!!parcelle}
@@ -540,18 +567,13 @@ function GardenPlanner() {
                 }}
                 onClick={() => parcelle && handleParcelleSelect(parcelle.id)}
               >
-                {parcelle && (
-                  <div style={{ 
-                    fontSize: '8px', 
-                    textAlign: 'center',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    padding: '2px'
-                  }}>
-                    {parcelle.nom}
-                  </div>
-                )}
+                {parcelle && parcelleGrids[parcelle.id] && (() => {
+                  const pos = parcellePositions[parcelle.id] || { row: 0, col: 0 };
+                  const relativeRow = row - pos.row;
+                  const relativeCol = col - pos.col;
+                  const gridIndex = (relativeRow * parcelle.cols) + relativeCol;
+                  return parcelleGrids[parcelle.id][gridIndex] || '';
+                })()}
               </div>
             );
           })}

@@ -116,7 +116,8 @@ class Version(db.Model):
 # Route pour récupérer toutes les cultures
 @app.route('/cultures', methods=['GET'])
 def get_cultures():
-    cultures = Culture.query.all()
+    # Exclure l'allée de la liste des cultures retournées
+    cultures = Culture.query.filter(Culture.nom != "Allée").all()
     return jsonify([culture.to_dict() for culture in cultures])
 
 # Route pour ajouter une culture
@@ -285,8 +286,26 @@ def get_versions():
     versions = Version.query.order_by(Version.created_at.desc()).all()
     return jsonify([version.to_dict() for version in versions])
 
+def init_default_data():
+    # Vérifier si l'allée existe déjà
+    allee = Culture.query.filter_by(nom="Allée").first()
+    if not allee:
+        allee_culture = Culture(
+            nom="Allée",
+            date_semis="1970-01-01",
+            type_culture="pleine terre",
+            date_recolte="2100-01-01",  # Date lointaine car c'est permanent
+            commentaire="Allée de passage",
+            couleur="#8B4513",  # Marron
+            emoji="⬛"  # Carré noir (apparaîtra en marron avec la couleur)
+        )
+        db.session.add(allee_culture)
+        db.session.commit()
+        print("Allée créée avec succès!")
+
 # Création de la base de données
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        init_default_data()
     app.run(port=8001, debug=True)
