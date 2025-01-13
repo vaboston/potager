@@ -416,227 +416,374 @@ function GardenPlanner() {
   };
 
   return (
-    <div style={{ padding: '20px', display: 'flex', gap: '20px' }}>
-      {/* Colonne de gauche pour les cultures */}
-      <div style={{ width: '250px' }}>
-        <div className="cultures-list" style={{
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          padding: '10px',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          backgroundColor: 'white',
-          position: 'sticky',
-          top: '20px'
-        }}>
-          {/* Section création de parcelle */}
-          <h3>Créer une parcelle</h3>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            marginBottom: '20px',
+    <div>
+      {/* Contenu principal */}
+      <div style={{ padding: '20px', display: 'flex', gap: '20px', marginBottom: '200px' }}>
+        {/* Colonne de gauche pour les cultures */}
+        <div style={{ width: '250px' }}>
+          <div className="cultures-list" style={{
+            maxHeight: '80vh',
+            overflowY: 'auto',
             padding: '10px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '4px'
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            backgroundColor: 'white',
+            position: 'sticky',
+            top: '20px'
           }}>
-            <input
-              type="text"
-              value={parcelleName}
-              onChange={(e) => setParcelleName(e.target.value)}
-              placeholder="Nom de la parcelle"
-              style={{
-                padding: '4px 8px',
-                borderRadius: '4px',
-                border: '1px solid #ddd'
-              }}
-            />
-            <div style={{ display: 'flex', gap: '4px' }}>
+            {/* Section création de parcelle */}
+            <h3>Créer une parcelle</h3>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              marginBottom: '20px',
+              padding: '10px',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '4px'
+            }}>
               <input
-                type="number"
-                value={gridSize.rows}
-                onChange={(e) => handleSizeChange('rows', e.target.value)}
-                placeholder="Lignes"
-                min="1"
-                max="20"
+                type="text"
+                value={parcelleName}
+                onChange={(e) => setParcelleName(e.target.value)}
+                placeholder="Nom de la parcelle"
                 style={{
-                  width: '50%',
                   padding: '4px 8px',
                   borderRadius: '4px',
                   border: '1px solid #ddd'
                 }}
               />
-              <input
-                type="number"
-                value={gridSize.cols}
-                onChange={(e) => handleSizeChange('cols', e.target.value)}
-                placeholder="Colonnes"
-                min="1"
-                max="20"
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <input
+                  type="number"
+                  value={gridSize.rows}
+                  onChange={(e) => handleSizeChange('rows', e.target.value)}
+                  placeholder="Lignes"
+                  min="1"
+                  max="20"
+                  style={{
+                    width: '50%',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd'
+                  }}
+                />
+                <input
+                  type="number"
+                  value={gridSize.cols}
+                  onChange={(e) => handleSizeChange('cols', e.target.value)}
+                  placeholder="Colonnes"
+                  min="1"
+                  max="20"
+                  style={{
+                    width: '50%',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd'
+                  }}
+                />
+              </div>
+              <button 
+                onClick={handleCreateParcelle}
+                disabled={!parcelleName || gridSize.rows * gridSize.cols <= 0}
                 style={{
-                  width: '50%',
-                  padding: '4px 8px',
+                  padding: '8px',
+                  backgroundColor: !parcelleName || gridSize.rows * gridSize.cols <= 0 ? '#cccccc' : '#4CAF50',
+                  color: 'white',
+                  border: 'none',
                   borderRadius: '4px',
-                  border: '1px solid #ddd'
+                  cursor: !parcelleName || gridSize.rows * gridSize.cols <= 0 ? 'not-allowed' : 'pointer'
                 }}
-              />
+              >
+                Créer une parcelle
+              </button>
             </div>
+
+            {/* Section liste des cultures */}
+            <h3>Cultures disponibles</h3>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {crops.map((crop) => (
+                <button
+                  key={crop.id}
+                  onClick={() => setSelectedCrop(crop.emoji)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    border: selectedCrop === crop.emoji ? '2px solid #4CAF50' : '1px solid #ddd',
+                    borderRadius: '4px',
+                    backgroundColor: selectedCrop === crop.emoji ? '#e8f5e9' : 'white',
+                    cursor: 'pointer',
+                    width: 'fit-content',
+                    textAlign: 'left',
+                    margin: '0'
+                  }}
+                >
+                  <span style={{ marginRight: '8px', fontSize: '1.2em' }}>{crop.emoji}</span>
+                  <div style={{ display: 'inline-block' }}>
+                    <div style={{ fontWeight: 'bold', display: 'inline' }}>{crop.nom}</div>
+                    <small style={{ 
+                      color: '#666',
+                      marginLeft: '8px',
+                      display: 'inline'
+                    }}>
+                      ({crop.usage_count || 0})
+                    </small>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Colonne centrale avec la grille et les contrôles */}
+        <div style={{ flex: '1', maxWidth: '800px' }}>
+          <h1>Organisation du Potager</h1>
+          
+          {/* Boutons pour gérer les versions */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
             <button 
-              onClick={handleCreateParcelle}
-              disabled={!parcelleName || gridSize.rows * gridSize.cols <= 0}
-              style={{
-                padding: '8px',
-                backgroundColor: !parcelleName || gridSize.rows * gridSize.cols <= 0 ? '#cccccc' : '#4CAF50',
+              onClick={handleDeleteParcelle} 
+              style={{ 
+                fontSize: '14px',
+                backgroundColor: selectedParcelle ? '#ff4444' : '#cccccc',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
-                cursor: !parcelleName || gridSize.rows * gridSize.cols <= 0 ? 'not-allowed' : 'pointer'
+                padding: '5px 10px',
+                borderRadius: '5px',
+                cursor: selectedParcelle ? 'pointer' : 'not-allowed'
+              }}
+              disabled={!selectedParcelle}
+            >
+              ❌ Supp. parcelle
+            </button>
+            <button 
+              onClick={createVersion} 
+              style={{ 
+                fontSize: '14px',
+                padding: '5px 10px',
+                borderRadius: '5px',
+                cursor: 'pointer'
               }}
             >
-              Créer une parcelle
+              🔄 Créer une version
+            </button>
+            <button 
+              onClick={() => setShowVersionsModal(true)} 
+              style={{ 
+                fontSize: '14px',
+                padding: '5px 10px',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              📋 Liste des versions
             </button>
           </div>
 
-          {/* Section liste des cultures */}
-          <h3>Cultures disponibles</h3>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            {crops.map((crop) => (
-              <button
-                key={crop.id}
-                onClick={() => setSelectedCrop(crop.emoji)}
-                style={{
-                  display: 'inline-flex',
+          {/* Grille */}
+          <div 
+            className="simple-grid"
+            style={{
+              gridTemplateColumns: `repeat(${gridSize.cols}, 1fr)`,
+              width: `${gridSize.cols * 60}px`
+            }}
+          >
+            {grid.map((cell, index) => (
+              <div 
+                key={index} 
+                className="simple-cell"
+                onClick={() => handleCellClick(index)}
+                style={{ 
+                  fontSize: '24px',
+                  width: '50px',
+                  height: '50px',
+                  display: 'flex',
                   alignItems: 'center',
-                  padding: '4px 8px',
-                  border: selectedCrop === crop.emoji ? '2px solid #4CAF50' : '1px solid #ddd',
-                  borderRadius: '4px',
-                  backgroundColor: selectedCrop === crop.emoji ? '#e8f5e9' : 'white',
-                  cursor: 'pointer',
-                  width: 'fit-content',
-                  textAlign: 'left',
-                  margin: '0'
+                  justifyContent: 'center',
+                  border: '1px solid #ccc',
+                  backgroundColor: selectedParcelle ? 'white' : '#f0f0f0'
                 }}
               >
-                <span style={{ marginRight: '8px', fontSize: '1.2em' }}>{crop.emoji}</span>
-                <div style={{ display: 'inline-block' }}>
-                  <div style={{ fontWeight: 'bold', display: 'inline' }}>{crop.nom}</div>
-                  <small style={{ 
-                    color: '#666',
-                    marginLeft: '8px',
-                    display: 'inline'
-                  }}>
-                    ({crop.usage_count || 0})
-                  </small>
-                </div>
-              </button>
+                {cell}
+              </div>
             ))}
+          </div>
+        </div>
+
+        {/* Nouvelle partie droite avec potager miniature */}
+        <div style={{ width: '400px' }}>
+          <h2 style={{ marginTop: '0', marginBottom: '20px' }}>Vue d'ensemble du potager</h2>
+          
+          {/* Contrôles de taille du potager */}
+          <div style={{ marginBottom: '20px' }}>
+            <label>Taille du potager : </label>
+            <input
+              type="number"
+              value={potagerSize.rows}
+              onChange={(e) => handlePotagerSizeChange('rows', e.target.value)}
+              min="1"
+              max="20"
+              style={{ width: '60px', marginRight: '10px' }}
+            />
+            x
+            <input
+              type="number"
+              value={potagerSize.cols}
+              onChange={(e) => handlePotagerSizeChange('cols', e.target.value)}
+              min="1"
+              max="20"
+              style={{ width: '60px', marginLeft: '10px' }}
+            />
+          </div>
+
+          {/* Grille du potager avec parcelles miniatures */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${potagerSize.cols}, 40px)`,
+            gap: '2px',
+            backgroundColor: '#ddd',
+            padding: '4px',
+            borderRadius: '4px',
+            margin: '0',
+            width: 'fit-content',
+            minWidth: 'min-content'
+          }}>
+            {Array.from({ length: potagerSize.rows * potagerSize.cols }).map((_, index) => {
+              const row = Math.floor(index / potagerSize.cols);
+              const col = index % potagerSize.cols;
+              
+              // Trouver si une parcelle occupe cette position
+              const parcelle = parcelles.find(p => {
+                const pos = parcellePositions[p.id] || { row: 0, col: 0 };
+                return row >= pos.row && 
+                       row < pos.row + p.rows && 
+                       col >= pos.col && 
+                       col < pos.col + p.cols;
+              });
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    backgroundColor: parcelle ? (selectedParcelle === parcelle.id ? '#4CAF50' : '#c8e6c9') : '#f0f0f0',
+                    border: '1px solid #ccc',
+                    cursor: parcelle ? 'move' : 'default',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '16px',
+                    userSelect: 'none'
+                  }}
+                  draggable={!!parcelle}
+                  onDragStart={(e) => {
+                    if (parcelle) {
+                      e.dataTransfer.setData('parcelleId', parcelle.id.toString());
+                    }
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const parcelleId = parseInt(e.dataTransfer.getData('parcelleId'));
+                    handleParcelleDrag(parcelleId, row, col);
+                  }}
+                  onClick={() => parcelle && handleParcelleSelect(parcelle.id)}
+                >
+                  {parcelle && parcelleGrids[parcelle.id] && (() => {
+                    const pos = parcellePositions[parcelle.id] || { row: 0, col: 0 };
+                    const relativeRow = row - pos.row;
+                    const relativeCol = col - pos.col;
+                    const gridIndex = (relativeRow * parcelle.cols) + relativeCol;
+                    return parcelleGrids[parcelle.id][gridIndex] || '';
+                  })()}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Liste des parcelles */}
+          <div style={{ marginTop: '20px' }}>
+            <h3>Parcelles disponibles</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {parcelles.map((parcelle) => (
+                <div
+                  key={parcelle.id}
+                  style={{
+                    width: `${parcelle.cols * 20}px`,
+                    height: `${parcelle.rows * 20}px`,
+                    backgroundColor: selectedParcelle === parcelle.id ? '#4CAF50' : '#fff',
+                    color: selectedParcelle === parcelle.id ? 'white' : 'black',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center'
+                  }}
+                  onClick={() => handleParcelleSelect(parcelle.id)}
+                >
+                  <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>
+                    {parcelle.nom}
+                  </div>
+                  <div style={{ fontSize: '10px', opacity: 0.8 }}>
+                    {parcelle.rows}×{parcelle.cols}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Colonne centrale avec la grille et les contrôles */}
-      <div style={{ flex: '1', maxWidth: '800px' }}>
-        <h1>Organisation du Potager</h1>
-        
-        {/* Boutons pour gérer les versions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
-          <button 
-            onClick={handleDeleteParcelle} 
-            style={{ 
-              fontSize: '14px',
-              backgroundColor: selectedParcelle ? '#ff4444' : '#cccccc',
-              color: 'white',
-              border: 'none',
-              padding: '5px 10px',
-              borderRadius: '5px',
-              cursor: selectedParcelle ? 'pointer' : 'not-allowed'
-            }}
-            disabled={!selectedParcelle}
-          >
-            ❌ Supp. parcelle
-          </button>
-          <button 
-            onClick={createVersion} 
-            style={{ 
-              fontSize: '14px',
-              padding: '5px 10px',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            🔄 Créer une version
-          </button>
-          <button 
-            onClick={() => setShowVersionsModal(true)} 
-            style={{ 
-              fontSize: '14px',
-              padding: '5px 10px',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            📋 Liste des versions
-          </button>
-        </div>
-
-        {/* Grille */}
-        <div 
-          className="simple-grid"
-          style={{
-            gridTemplateColumns: `repeat(${gridSize.cols}, 1fr)`,
-            width: `${gridSize.cols * 60}px`
-          }}
-        >
-          {grid.map((cell, index) => (
-            <div 
-              key={index} 
-              className="simple-cell"
-              onClick={() => handleCellClick(index)}
-              style={{ 
-                fontSize: '24px',
-                width: '50px',
-                height: '50px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid #ccc',
-                backgroundColor: selectedParcelle ? 'white' : '#f0f0f0'
-              }}
-            >
-              {cell}
-            </div>
-          ))}
-        </div>
-
-        {/* Nouveau composant de planning */}
-        <div style={{
-          marginTop: '30px',
-          padding: '20px',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      {/* Pied de page fixe pour les échéances */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'white',
+        boxShadow: '0 -2px 10px rgba(0,0,0,0.1)',
+        padding: '15px',
+        zIndex: 1000
+      }}>
+        <div style={{ 
+          maxWidth: '100%',
+          margin: '0 auto',
+          padding: '0 20px'
         }}>
-          <h3 style={{ marginTop: '0', marginBottom: '15px' }}>
+          <h3 style={{ margin: '0 0 10px 0' }}>
             Échéances des 15 prochains jours
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '15px',
+            overflowX: 'auto',
+            paddingBottom: '5px'
+          }}>
             {getUpcomingDeadlines().map((deadline, index) => (
               <div 
                 key={index}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '8px',
-                  backgroundColor: 'white',
+                  padding: '10px',
+                  backgroundColor: '#f5f5f5',
                   borderRadius: '4px',
-                  gap: '10px'
+                  gap: '12px',
+                  minWidth: '300px',
+                  flex: '1'
                 }}
               >
-                <span style={{ fontSize: '20px' }}>{deadline.emoji}</span>
+                <span style={{ fontSize: '24px' }}>{deadline.emoji}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 'bold' }}>{deadline.culture}</div>
                   <div style={{ fontSize: '0.9em', color: '#666' }}>
@@ -646,9 +793,10 @@ function GardenPlanner() {
                 <div style={{
                   backgroundColor: deadline.daysLeft <= 3 ? '#ff4444' : '#4CAF50',
                   color: 'white',
-                  padding: '4px 8px',
+                  padding: '4px 10px',
                   borderRadius: '12px',
-                  fontSize: '0.8em'
+                  fontSize: '0.9em',
+                  whiteSpace: 'nowrap'
                 }}>
                   {deadline.daysLeft === 0 ? "Aujourd'hui" : 
                    deadline.daysLeft === 1 ? "Demain" :
@@ -657,136 +805,15 @@ function GardenPlanner() {
               </div>
             ))}
             {getUpcomingDeadlines().length === 0 && (
-              <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
+              <div style={{ 
+                textAlign: 'center', 
+                color: '#666', 
+                padding: '20px',
+                width: '100%'
+              }}>
                 Aucune échéance dans les 15 prochains jours
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Nouvelle partie droite avec potager miniature */}
-      <div style={{ width: '400px' }}>
-        <h2 style={{ marginTop: '0', marginBottom: '20px' }}>Vue d'ensemble du potager</h2>
-        
-        {/* Contrôles de taille du potager */}
-        <div style={{ marginBottom: '20px' }}>
-          <label>Taille du potager : </label>
-          <input
-            type="number"
-            value={potagerSize.rows}
-            onChange={(e) => handlePotagerSizeChange('rows', e.target.value)}
-            min="1"
-            max="20"
-            style={{ width: '60px', marginRight: '10px' }}
-          />
-          x
-          <input
-            type="number"
-            value={potagerSize.cols}
-            onChange={(e) => handlePotagerSizeChange('cols', e.target.value)}
-            min="1"
-            max="20"
-            style={{ width: '60px', marginLeft: '10px' }}
-          />
-        </div>
-
-        {/* Grille du potager avec parcelles miniatures */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${potagerSize.cols}, 40px)`,
-          gap: '2px',
-          backgroundColor: '#ddd',
-          padding: '4px',
-          borderRadius: '4px',
-          margin: '0 auto'
-        }}>
-          {Array.from({ length: potagerSize.rows * potagerSize.cols }).map((_, index) => {
-            const row = Math.floor(index / potagerSize.cols);
-            const col = index % potagerSize.cols;
-            
-            // Trouver si une parcelle occupe cette position
-            const parcelle = parcelles.find(p => {
-              const pos = parcellePositions[p.id] || { row: 0, col: 0 };
-              return row >= pos.row && 
-                     row < pos.row + p.rows && 
-                     col >= pos.col && 
-                     col < pos.col + p.cols;
-            });
-
-            return (
-              <div
-                key={index}
-                style={{
-                  width: '30px',
-                  height: '30px',
-                  backgroundColor: parcelle ? (selectedParcelle === parcelle.id ? '#4CAF50' : '#c8e6c9') : '#f0f0f0',
-                  border: '1px solid #ccc',
-                  cursor: parcelle ? 'move' : 'default',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '16px',
-                  userSelect: 'none'
-                }}
-                draggable={!!parcelle}
-                onDragStart={(e) => {
-                  if (parcelle) {
-                    e.dataTransfer.setData('parcelleId', parcelle.id.toString());
-                  }
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const parcelleId = parseInt(e.dataTransfer.getData('parcelleId'));
-                  handleParcelleDrag(parcelleId, row, col);
-                }}
-                onClick={() => parcelle && handleParcelleSelect(parcelle.id)}
-              >
-                {parcelle && parcelleGrids[parcelle.id] && (() => {
-                  const pos = parcellePositions[parcelle.id] || { row: 0, col: 0 };
-                  const relativeRow = row - pos.row;
-                  const relativeCol = col - pos.col;
-                  const gridIndex = (relativeRow * parcelle.cols) + relativeCol;
-                  return parcelleGrids[parcelle.id][gridIndex] || '';
-                })()}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Liste des parcelles */}
-        <div style={{ marginTop: '20px' }}>
-          <h3>Parcelles disponibles</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-            {parcelles.map((parcelle) => (
-              <div
-                key={parcelle.id}
-                style={{
-                  width: `${parcelle.cols * 20}px`,
-                  height: `${parcelle.rows * 20}px`,
-                  backgroundColor: selectedParcelle === parcelle.id ? '#4CAF50' : '#fff',
-                  color: selectedParcelle === parcelle.id ? 'white' : 'black',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  padding: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textAlign: 'center'
-                }}
-                onClick={() => handleParcelleSelect(parcelle.id)}
-              >
-                <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>
-                  {parcelle.nom}
-                </div>
-                <div style={{ fontSize: '10px', opacity: 0.8 }}>
-                  {parcelle.rows}×{parcelle.cols}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
