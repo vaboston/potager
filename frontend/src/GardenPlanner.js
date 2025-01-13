@@ -18,6 +18,7 @@ function GardenPlanner() {
   const [lastSelectedVersion, setLastSelectedVersion] = useState(null);
   const [versionName, setVersionName] = useState('');
   const [parcelleGrids, setParcelleGrids] = useState({});
+  const [currentVersion, setCurrentVersion] = useState(null);
 
   // Gestion du changement de taille
   const handleSizeChange = (type, value) => {
@@ -381,19 +382,31 @@ function GardenPlanner() {
     setParcelles(version.parcelles);
     setParcellePositions(version.parcelle_positions);
     
-    // Restaurer les cultures de chaque parcelle
-    const newGrid = Array(gridSize.rows * gridSize.cols).fill('');
-    Object.entries(version.parcelle_cultures).forEach(([parcelleId, cultures]) => {
-      cultures.forEach((culture, index) => {
-        if (culture) {
-          newGrid[index] = culture;
-        }
-      });
+    // Mettre à jour les grilles de parcelles
+    const newParcelleGrids = {};
+    version.parcelles.forEach(parcelle => {
+      const parcelleId = parcelle.id.toString();
+      if (version.parcelle_cultures && version.parcelle_cultures[parcelleId]) {
+        newParcelleGrids[parcelleId] = version.parcelle_cultures[parcelleId];
+      } else {
+        // Créer une grille vide si aucune culture n'est trouvée
+        const gridSize = parcelle.rows * parcelle.cols;
+        newParcelleGrids[parcelleId] = Array(gridSize).fill('');
+      }
     });
-    setGrid(newGrid);
     
+    setParcelleGrids(newParcelleGrids);
     setLastSelectedVersion(version.id);
+    setCurrentVersion(version);
     setShowVersionsModal(false);
+    
+    // Si une parcelle est sélectionnée, mettre à jour sa grille
+    if (selectedParcelle) {
+      const parcelleId = selectedParcelle.toString();
+      if (newParcelleGrids[parcelleId]) {
+        setGrid(newParcelleGrids[parcelleId]);
+      }
+    }
   };
 
   const handleDeleteParcelle = async () => {
@@ -542,7 +555,18 @@ function GardenPlanner() {
 
         {/* Colonne centrale avec la grille et les contrôles */}
         <div style={{ flex: '1', maxWidth: '800px' }}>
-          <h1>Organisation du Potager</h1>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '20px' }}>
+            <h1 style={{ margin: 0 }}>Organisation du Potager</h1>
+            {currentVersion && (
+              <span style={{ 
+                color: '#666', 
+                fontSize: '0.9em',
+                fontStyle: 'italic'
+              }}>
+                (Version : {currentVersion.name})
+              </span>
+            )}
+          </div>
           
           {/* Boutons pour gérer les versions */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>

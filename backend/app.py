@@ -27,6 +27,7 @@ class Culture(db.Model):
     commentaire = db.Column(db.String(255), nullable=True)
     couleur = db.Column(db.String(7), nullable=False) 
     emoji = db.Column(db.String(10), nullable=True)
+    temp_emoji = db.Column(db.String(10), nullable=True)
 
 
     def to_dict(self):
@@ -39,7 +40,8 @@ class Culture(db.Model):
             'date_recolte': self.date_recolte,
             'commentaire': self.commentaire,
             'couleur': self.couleur,
-            'emoji': self.emoji
+            'emoji': self.emoji,
+            'temp_emoji': self.temp_emoji
         }
 
 # Modèle pour l'organisation du potager (parcelles)
@@ -138,6 +140,10 @@ def get_cultures():
 @app.route('/cultures', methods=['POST'])
 def add_culture():
     data = request.get_json()
+    
+    # Déterminer l'emoji de température en fonction du type de culture
+    temp_emoji = '❄️' if data['type_culture'] == 'pleine terre' else '🌡️'
+    
     new_culture = Culture(
         nom=data['nom'],
         date_semis=data['date_semis'],
@@ -146,7 +152,8 @@ def add_culture():
         date_recolte=data.get('date_recolte'),
         commentaire=data.get('commentaire'),
         emoji=data.get('emoji'),
-        couleur=data.get('couleur')
+        couleur=data.get('couleur'),
+        temp_emoji=temp_emoji
     )
     db.session.add(new_culture)
     db.session.commit()
@@ -300,14 +307,26 @@ def create_version():
     
     # Mettre à jour toutes les versions existantes comme non courantes
     Version.query.update({Version.is_current: False})
-    db.session.commit()  # Commit immédiat pour éviter les conflits
+    
+    # Récupérer le contenu actuel des parcelles
+    parcelle_cultures = {}
+    for parcelle in data['parcelles']:
+        parcelle_id = parcelle['id']
+        # Récupérer toutes les cultures de cette parcelle
+        cultures = Parcelle.query.filter_by(parcelle_config_id=parcelle_id).all()
+        grid = [''] * (parcelle['rows'] * parcelle['cols'])
+        for culture in cultures:
+            index = culture.row * parcelle['cols'] + culture.col
+            if 0 <= index < len(grid):
+                grid[index] = culture.culture_emoji
+        parcelle_cultures[str(parcelle_id)] = grid
     
     new_version = Version(
         name=data.get('name'),
         parcelles=data['parcelles'],
         parcelle_positions=data['parcellePositions'],
-        parcelle_cultures=data.get('parcelleCultures', {}),
-        is_current=True  # La nouvelle version est toujours courante
+        parcelle_cultures=parcelle_cultures,  # Utiliser les cultures récupérées
+        is_current=True
     )
     db.session.add(new_version)
     db.session.commit()
@@ -448,6 +467,62 @@ def get_popular_cultures():
     except Exception as e:
         print(f"Erreur: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# Ajouter cette nouvelle route après la route GET /cultures
+@app.route('/cultures/<int:id>', methods=['PUT'])
+def update_culture(id):
+    try:
+        culture = Culture.query.get_or_404(id)
+        data = request.get_json()
+        
+        # Mettre à jour l'emoji de température en fonction du type de culture
+        temp_emoji = '❄️' if data['type_culture'] == 'pleine terre' else '🌡️'
+        
+        # Mise à jour des champs
+        culture.nom = data['nom']
+        culture.date_semis = data['date_semis']
+        culture.type_culture = data['type_culture']
+        culture.date_repiquage = data.get('date_repiquage')
+        culture.date_recolte = data.get('date_recolte')
+        culture.commentaire = data.get('commentaire')
+        culture.emoji = data.get('emoji')
+        culture.couleur = data.get('couleur')
+        culture.temp_emoji = temp_emoji
+        
+        db.session.commit()
+        return jsonify({"message": "Culture mise à jour avec succès!", "culture": culture.to_dict()}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# Ajouter également une route pour récupérer une culture spécifique
+@app.route('/cultures/<int:id>', methods=['GET'])
+def get_culture(id):
+    try:
+        culture = Culture.query.get_or_404(id)
+        return jsonify(culture.to_dict()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 404
+
+# Modifions la route pour récupérer une version spécifique
+@app.route('/versions/<int:id>', methods=['GET'])
+def get_version(id):
+    version = Version.query.get_or_404(id)
+    
+    # Récupérer toutes les parcelles associées à cette version
+    parcelles_data = []
+    for parcelle in version.parcelles:
+        parcelle_dict = parcelle.copy()  # Copie du dictionnaire de la parcelle
+        # Ajouter les cultures associées à cette parcelle
+        if str(parcelle['id']) in version.parcelle_cultures:
+            parcelle_dict['cultures'] = version.parcelle_cultures[str(parcelle['id'])]
+        parcelles_data.append(parcelle_dict)
+
+    response_data = version.to_dict()
+    response_data['parcelles'] = parcelles_data
+    
+    return jsonify(response_data)
 
 # Création de la base de données
 if __name__ == "__main__":

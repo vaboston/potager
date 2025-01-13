@@ -43,12 +43,27 @@ function CalendarTable() {
   // Fonction pour vérifier si une case doit être colorée
   const isHighlightedDay = (culture, day, monthIndex) => {
     const semisDate = new Date(culture.date_semis);
+    const repiquageDate = culture.date_repiquage ? new Date(culture.date_repiquage) : null;
     const recolteDate = culture.date_recolte ? new Date(culture.date_recolte) : null;
 
-    if (!recolteDate) return false;
-
     const currentDate = new Date(semisDate.getFullYear(), monthIndex, day);
-    return currentDate >= semisDate && currentDate <= recolteDate;
+
+    // Vérifier si la date est entre semis et repiquage
+    const isBetweenSemisAndRepiquage = repiquageDate && 
+      currentDate >= semisDate && 
+      currentDate <= repiquageDate;
+
+    // Vérifier si la date est entre repiquage et récolte
+    const isBetweenRepiquageAndRecolte = repiquageDate && recolteDate && 
+      currentDate >= repiquageDate && 
+      currentDate <= recolteDate;
+
+    // Vérifier si la date est entre semis et récolte (si pas de repiquage)
+    const isBetweenSemisAndRecolte = !repiquageDate && recolteDate && 
+      currentDate >= semisDate && 
+      currentDate <= recolteDate;
+
+    return isBetweenSemisAndRepiquage || isBetweenRepiquageAndRecolte || isBetweenSemisAndRecolte;
   };
 
   // Fonction pour afficher le tooltip
@@ -95,6 +110,14 @@ function CalendarTable() {
               <td>
                 <strong>{culture.nom}</strong>
                 <br />
+                <span 
+                  onMouseEnter={(e) => showTooltip(culture.type_culture === 'pleine terre' ? 'Pleine terre' : 'Sous serre', e)}
+                  onMouseLeave={hideTooltip}
+                  style={{ cursor: 'help' }}
+                >
+                  {culture.temp_emoji}
+                </span>
+                <br />
                 <em>{culture.commentaire}</em>
               </td>
               {months.map((_, monthIndex) => (
@@ -131,7 +154,17 @@ function CalendarTable() {
       {tooltip.visible && (
         <div
           className="tooltip"
-          style={{ top: tooltip.y, left: tooltip.x }}
+          style={{ 
+            top: tooltip.y, 
+            left: tooltip.x,
+            backgroundColor: '#333',
+            color: 'white',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            position: 'fixed',
+            zIndex: 1000
+          }}
         >
           {tooltip.text}
         </div>

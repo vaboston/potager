@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 // Liste d'emojis de légumes, fruits, et plantes
@@ -17,8 +17,55 @@ function AddCulture() {
     date_recolte: '',
     commentaire: '',
     couleur: '#ffffff',
-    emoji: emojis[0]  // Emoji par défaut
+    emoji: emojis[0]
   });
+  const [cultures, setCultures] = useState([]); // Pour stocker la liste des cultures existantes
+  const [selectedCultureId, setSelectedCultureId] = useState(''); // Pour suivre la culture sélectionnée
+
+  // Charger les cultures existantes au chargement du composant
+  useEffect(() => {
+    axios.get('http://localhost:8001/cultures')
+      .then(response => {
+        setCultures(response.data);
+      })
+      .catch(error => console.error('Erreur lors du chargement des cultures:', error));
+  }, []);
+
+  // Fonction pour charger une culture existante
+  const handleCultureSelect = (event) => {
+    const cultureId = event.target.value;
+    setSelectedCultureId(cultureId);
+
+    if (cultureId) {
+      axios.get(`http://localhost:8001/cultures/${cultureId}`)
+        .then(response => {
+          const culture = response.data;
+          setFormData({
+            nom: culture.nom,
+            date_semis: culture.date_semis,
+            type_culture: culture.type_culture,
+            date_repiquage: culture.date_repiquage || '',
+            date_recolte: culture.date_recolte || '',
+            commentaire: culture.commentaire || '',
+            couleur: culture.couleur || '#ffffff',
+            emoji: culture.emoji
+          });
+        })
+        .catch(error => console.error('Erreur lors du chargement de la culture:', error));
+    } else {
+      // Réinitialiser le formulaire si "Nouvelle culture" est sélectionné
+      setFormData({
+        nom: '',
+        date_semis: '',
+        type_culture: 'pleine terre',
+        date_repiquage: '',
+        date_recolte: '',
+        commentaire: '',
+        couleur: '#ffffff',
+        emoji: emojis[0]
+      });
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -30,9 +77,19 @@ function AddCulture() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    axios.post('http://localhost:8001/cultures', formData)
+    const apiCall = selectedCultureId
+      ? axios.put(`http://localhost:8001/cultures/${selectedCultureId}`, formData)
+      : axios.post('http://localhost:8001/cultures', formData);
+
+    apiCall
       .then(() => {
-        alert('Culture ajoutée avec succès !');
+        alert(selectedCultureId ? 'Culture modifiée avec succès !' : 'Culture ajoutée avec succès !');
+        // Recharger la liste des cultures
+        return axios.get('http://localhost:8001/cultures');
+      })
+      .then(response => {
+        setCultures(response.data);
+        // Réinitialiser le formulaire et la sélection
         setFormData({
           nom: '',
           date_semis: '',
@@ -43,9 +100,10 @@ function AddCulture() {
           couleur: '#ffffff',
           emoji: emojis[0]
         });
+        setSelectedCultureId('');
       })
       .catch(error => {
-        alert('Erreur lors de l’ajout de la culture.');
+        alert('Erreur lors de l\'opération.');
         console.error(error);
       });
   };
@@ -60,7 +118,82 @@ function AddCulture() {
         textAlign: 'center',
         color: '#2c3e50',
         marginBottom: '30px'
-      }}>🌱 Ajouter une Culture</h1>
+      }}>
+        🌱 {selectedCultureId ? 'Modifier une Culture' : 'Ajouter une Culture'}
+      </h1>
+
+      {/* Sélecteur de culture existante */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <select
+          value={selectedCultureId}
+          onChange={handleCultureSelect}
+          style={{
+            width: '100%',
+            padding: '10px',
+            borderRadius: '5px',
+            border: '1px solid #ddd',
+            fontSize: '16px',
+            backgroundColor: 'white'
+          }}
+        >
+          <option value="">Nouvelle culture</option>
+          {cultures.map(culture => (
+            <option key={culture.id} value={culture.id}>
+              {culture.emoji} {culture.nom}
+            </option>
+          ))}
+        </select>
+        
+        {selectedCultureId && (
+          <button
+            onClick={() => {
+              if (window.confirm('Êtes-vous sûr de vouloir supprimer cette culture ?')) {
+                axios.delete(`http://localhost:8001/cultures/${selectedCultureId}`)
+                  .then(() => {
+                    alert('Culture supprimée avec succès !');
+                    setCultures(cultures.filter(c => c.id !== parseInt(selectedCultureId)));
+                    setSelectedCultureId('');
+                    setFormData({
+                      nom: '',
+                      date_semis: '',
+                      type_culture: 'pleine terre',
+                      date_repiquage: '',
+                      date_recolte: '',
+                      commentaire: '',
+                      couleur: '#ffffff',
+                      emoji: emojis[0]
+                    });
+                  })
+                  .catch(error => console.error('Erreur lors de la suppression:', error));
+              }
+            }}
+            style={{
+              padding: '0 15px',
+              borderRadius: '5px',
+              border: '1px solid #ff4444',
+              backgroundColor: 'white',
+              color: '#ff4444',
+              cursor: 'pointer',
+              fontSize: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={e => {
+              e.target.style.backgroundColor = '#ff4444';
+              e.target.style.color = 'white';
+            }}
+            onMouseOut={e => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.color = '#ff4444';
+            }}
+          >
+            ❌
+          </button>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} style={{
         backgroundColor: 'white',
@@ -247,7 +380,7 @@ function AddCulture() {
           onMouseOver={e => e.target.style.backgroundColor = '#45a049'}
           onMouseOut={e => e.target.style.backgroundColor = '#4CAF50'}
         >
-          Ajouter la culture
+          {selectedCultureId ? 'Modifier la culture' : 'Ajouter la culture'}
         </button>
       </form>
     </div>
