@@ -10,6 +10,8 @@ function GardenPlanner() {
   const [parcelleName, setParcelleName] = useState('');
   const [parcelles, setParcelles] = useState([]);
   const [selectedParcelle, setSelectedParcelle] = useState(null);
+  const [potagerSize, setPotagerSize] = useState({ rows: 10, cols: 10 });
+  const [parcellePositions, setParcellePositions] = useState({});
 
   // Gestion du changement de taille
   const handleSizeChange = (type, value) => {
@@ -30,6 +32,27 @@ function GardenPlanner() {
     axios.get('http://localhost:8001/parcelles')
       .then(response => setParcelles(response.data))
       .catch(error => console.error('Erreur chargement parcelles:', error));
+  }, []);
+
+  // Charger les positions au démarrage
+  useEffect(() => {
+    const loadPositions = async () => {
+      try {
+        const response = await axios.get('http://localhost:8001/parcelles/positions');
+        const positions = {};
+        response.data.forEach(pos => {
+          positions[pos.parcelle_config_id] = { 
+            row: pos.position_y, 
+            col: pos.position_x 
+          };
+        });
+        setParcellePositions(positions);
+      } catch (error) {
+        console.error('Erreur chargement positions:', error);
+      }
+    };
+
+    loadPositions();
   }, []);
 
   const handleCellClick = async (index) => {
@@ -97,6 +120,27 @@ function GardenPlanner() {
     } catch (error) {
       console.error('Erreur chargement parcelle:', error);
       alert('Erreur lors du chargement de la parcelle');
+    }
+  };
+
+  // Fonction pour déplacer une parcelle
+  const handleParcelleDrag = async (parcelleId, newRow, newCol) => {
+    try {
+      // Mettre à jour l'interface
+      setParcellePositions(prev => ({
+        ...prev,
+        [parcelleId]: { row: newRow, col: newCol }
+      }));
+
+      // Sauvegarder dans la base de données
+      await axios.post('http://localhost:8001/parcelles/position', {
+        parcelleId: parcelleId,
+        x: newCol,
+        y: newRow
+      });
+    } catch (error) {
+      console.error('Erreur sauvegarde position:', error);
+      alert('Erreur lors de la sauvegarde de la position');
     }
   };
 
@@ -182,35 +226,136 @@ function GardenPlanner() {
         </div>
       </div>
 
-      {/* Partie droite avec les boutons de parcelles */}
+      {/* Nouvelle partie droite avec potager miniature */}
       <div style={{ 
-        width: '200px', 
+        width: '400px', 
         padding: '20px',
         backgroundColor: '#f5f5f5',
         borderRadius: '8px',
         marginTop: '60px'
       }}>
-        <h2 style={{ marginTop: '0', marginBottom: '20px' }}>Mes Parcelles</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {parcelles.map((parcelle) => (
-            <button
-              key={parcelle.id}
-              onClick={() => handleParcelleSelect(parcelle.id)}
-              style={{
-                padding: '10px',
-                backgroundColor: selectedParcelle === parcelle.id ? '#4CAF50' : '#fff',
-                color: selectedParcelle === parcelle.id ? 'white' : 'black',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {parcelle.nom}
-              <br />
-              <small>{parcelle.rows}×{parcelle.cols}</small>
-            </button>
-          ))}
+        <h2 style={{ marginTop: '0', marginBottom: '20px' }}>Vue d'ensemble du potager</h2>
+        
+        {/* Contrôles de taille du potager */}
+        <div style={{ marginBottom: '20px' }}>
+          <label>Taille du potager : </label>
+          <input
+            type="number"
+            value={potagerSize.rows}
+            onChange={(e) => setPotagerSize(prev => ({ ...prev, rows: parseInt(e.target.value) || 1 }))}
+            min="1"
+            max="20"
+            style={{ width: '60px', marginRight: '10px' }}
+          />
+          x
+          <input
+            type="number"
+            value={potagerSize.cols}
+            onChange={(e) => setPotagerSize(prev => ({ ...prev, cols: parseInt(e.target.value) || 1 }))}
+            min="1"
+            max="20"
+            style={{ width: '60px', marginLeft: '10px' }}
+          />
+        </div>
+
+        {/* Grille du potager avec parcelles miniatures */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${potagerSize.cols}, 1fr)`,
+          gap: '2px',
+          backgroundColor: '#ddd',
+          padding: '4px',
+          borderRadius: '4px'
+        }}>
+          {Array.from({ length: potagerSize.rows * potagerSize.cols }).map((_, index) => {
+            const row = Math.floor(index / potagerSize.cols);
+            const col = index % potagerSize.cols;
+            
+            // Trouver si une parcelle occupe cette position
+            const parcelle = parcelles.find(p => {
+              const pos = parcellePositions[p.id] || { row: 0, col: 0 };
+              return row >= pos.row && 
+                     row < pos.row + p.rows && 
+                     col >= pos.col && 
+                     col < pos.col + p.cols;
+            });
+
+            return (
+              <div
+                key={index}
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  backgroundColor: parcelle ? (selectedParcelle === parcelle.id ? '#4CAF50' : '#fff') : '#f0f0f0',
+                  border: '1px solid #ccc',
+                  cursor: parcelle ? 'move' : 'default',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  userSelect: 'none'
+                }}
+                draggable={!!parcelle}
+                onDragStart={(e) => {
+                  if (parcelle) {
+                    e.dataTransfer.setData('parcelleId', parcelle.id.toString());
+                  }
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const parcelleId = parseInt(e.dataTransfer.getData('parcelleId'));
+                  handleParcelleDrag(parcelleId, row, col);
+                }}
+                onClick={() => parcelle && handleParcelleSelect(parcelle.id)}
+              >
+                {parcelle && (
+                  <div style={{ 
+                    fontSize: '8px', 
+                    textAlign: 'center',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    padding: '2px'
+                  }}>
+                    {parcelle.nom}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Liste des parcelles */}
+        <div style={{ marginTop: '20px' }}>
+          <h3>Parcelles disponibles</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {parcelles.map((parcelle) => (
+              <div
+                key={parcelle.id}
+                style={{
+                  width: `${parcelle.cols * 20}px`,
+                  height: `${parcelle.rows * 20}px`,
+                  backgroundColor: selectedParcelle === parcelle.id ? '#4CAF50' : '#fff',
+                  color: selectedParcelle === parcelle.id ? 'white' : 'black',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  padding: '4px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center'
+                }}
+                onClick={() => handleParcelleSelect(parcelle.id)}
+              >
+                {parcelle.nom}
+                <br />
+                <small>{parcelle.rows}×{parcelle.cols}</small>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

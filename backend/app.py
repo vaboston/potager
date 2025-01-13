@@ -75,6 +75,22 @@ class Parcelle(db.Model):
             'culture_emoji': self.culture_emoji
         }
 
+# Ajouter ce nouveau modèle après les autres modèles
+class ParcellePosition(db.Model):
+    __tablename__ = 'parcelle_position'
+    id = db.Column(db.Integer, primary_key=True)
+    parcelle_config_id = db.Column(db.Integer, db.ForeignKey('parcelle_config.id'), nullable=False)
+    position_x = db.Column(db.Integer, nullable=False)
+    position_y = db.Column(db.Integer, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'parcelle_config_id': self.parcelle_config_id,
+            'position_x': self.position_x,
+            'position_y': self.position_y
+        }
+
 # Route pour récupérer toutes les cultures
 @app.route('/cultures', methods=['GET'])
 def get_cultures():
@@ -191,6 +207,35 @@ def get_parcelle(id):
     except Exception as e:
         print(f"Erreur: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# Ajouter ces nouvelles routes après les autres routes
+@app.route('/parcelles/position', methods=['POST'])
+def update_parcelle_position():
+    data = request.get_json()
+    parcelle_id = data.get('parcelleId')
+    position_x = data.get('x')
+    position_y = data.get('y')
+    
+    position = ParcellePosition.query.filter_by(parcelle_config_id=parcelle_id).first()
+    
+    if position:
+        position.position_x = position_x
+        position.position_y = position_y
+    else:
+        position = ParcellePosition(
+            parcelle_config_id=parcelle_id,
+            position_x=position_x,
+            position_y=position_y
+        )
+        db.session.add(position)
+    
+    db.session.commit()
+    return jsonify({"message": "Position mise à jour"})
+
+@app.route('/parcelles/positions', methods=['GET'])
+def get_parcelle_positions():
+    positions = ParcellePosition.query.all()
+    return jsonify([pos.to_dict() for pos in positions])
 
 # Création de la base de données
 if __name__ == "__main__":
