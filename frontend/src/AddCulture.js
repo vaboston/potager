@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+// Liste d'emojis de légumes, fruits, et plantes
+const emojis = [
+  '🌱', '🥕', '🍅', '🥬', '🌽', '🍆', '🥒', '🫑', '🍓', '🍇',
+  '🍉', '🍊', '🍋', '🍌', '🍍', '🥭', '🍎', '🍏', '🍐', '🍑',
+  '🍒', '🍈', '🥔', '🥜', '🌶️', '🧄', '🧅', '🍠'
+];
+
 function AddCulture() {
   const [formData, setFormData] = useState({
     nom: '',
@@ -8,7 +15,9 @@ function AddCulture() {
     type_culture: 'pleine terre',
     date_repiquage: '',
     date_recolte: '',
-    commentaire: ''
+    commentaire: '',
+    couleur: '#ffffff',
+    emoji: emojis[0]  // Emoji par défaut
   });
 
   const handleChange = (e) => {
@@ -30,7 +39,9 @@ function AddCulture() {
           type_culture: 'pleine terre',
           date_repiquage: '',
           date_recolte: '',
-          commentaire: ''
+          commentaire: '',
+          couleur: '#ffffff',
+          emoji: emojis[0]
         });
       })
       .catch(error => {
@@ -93,6 +104,27 @@ function AddCulture() {
           value={formData.commentaire}
           onChange={handleChange}
         ></textarea>
+
+        <label>Couleur :</label>
+        <input
+          type="color"
+          name="couleur"
+          value={formData.couleur}
+          onChange={handleChange}
+        />
+
+        <label>Emoji :</label>
+        <select
+          name="emoji"
+          value={formData.emoji}
+          onChange={handleChange}
+        >
+          {emojis.map((emoji, index) => (
+            <option key={index} value={emoji}>
+              {emoji}
+            </option>
+          ))}
+        </select>
 
         <button type="submit">Ajouter</button>
       </form>

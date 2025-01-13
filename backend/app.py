@@ -22,7 +22,10 @@ class Culture(db.Model):
     type_culture = db.Column(db.String(20), nullable=False)
     date_repiquage = db.Column(db.String(10), nullable=True)
     date_recolte = db.Column(db.String(10), nullable=True)
-    commentaire = db.Column(db.String(255), nullable=True)  # Nouveau champ
+    commentaire = db.Column(db.String(255), nullable=True)
+    couleur = db.Column(db.String(7), nullable=False) 
+    emoji = db.Column(db.String(10), nullable=True)
+
 
     def to_dict(self):
         return {
@@ -32,8 +35,18 @@ class Culture(db.Model):
             'type_culture': self.type_culture,
             'date_repiquage': self.date_repiquage,
             'date_recolte': self.date_recolte,
-            'commentaire': self.commentaire
+            'commentaire': self.commentaire,
+            'couleur': self.couleur,
+            'emoji': self.emoji
         }
+
+# Modèle pour l'organisation du potager (parcelles)
+class Parcelle(db.Model):
+    __tablename__ = 'parcelle'
+    id = db.Column(db.Integer, primary_key=True)
+    row = db.Column(db.Integer, nullable=False)
+    col = db.Column(db.Integer, nullable=False)
+    culture_nom = db.Column(db.String(50), nullable=True)
 
 # Route pour récupérer toutes les cultures
 @app.route('/cultures', methods=['GET'])
@@ -51,7 +64,9 @@ def add_culture():
         type_culture=data['type_culture'],
         date_repiquage=data.get('date_repiquage'),
         date_recolte=data.get('date_recolte'),
-        commentaire=data.get('commentaire')
+        commentaire=data.get('commentaire'),
+        emoji=data.get('emoji'),
+        couleur=data.get('couleur')
     )
     db.session.add(new_culture)
     db.session.commit()
@@ -64,6 +79,30 @@ def delete_culture(id):
     db.session.delete(culture)
     db.session.commit()
     return jsonify({"message": "Culture supprimée avec succès !"}), 200
+
+# Route pour récupérer les parcelles sauvegardées
+@app.route('/parcelles', methods=['GET'])
+def get_parcelles():
+    parcelles = Parcelle.query.all()
+    return jsonify([
+        {"row": parcelle.row, "col": parcelle.col, "culture_nom": parcelle.culture_nom}
+        for parcelle in parcelles
+    ])
+
+# Route pour mettre à jour une parcelle
+@app.route('/parcelles', methods=['POST'])
+def update_parcelle():
+    data = request.get_json()
+    parcelle = Parcelle.query.filter_by(row=data['row'], col=data['col']).first()
+
+    if parcelle:
+        parcelle.culture_nom = data['culture_nom']
+    else:
+        parcelle = Parcelle(row=data['row'], col=data['col'], culture_nom=data['culture_nom'])
+        db.session.add(parcelle)
+
+    db.session.commit()
+    return jsonify({"message": "Parcelle mise à jour avec succès"})
 
 # Création de la base de données
 if __name__ == "__main__":
