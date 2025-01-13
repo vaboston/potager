@@ -251,29 +251,42 @@ def get_parcelle(id):
         print(f"Erreur: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-# Ajouter ces nouvelles routes après les autres routes
+# Modifier la route pour mettre à jour la position d'une parcelle
 @app.route('/parcelles/position', methods=['POST'])
 def update_parcelle_position():
-    data = request.get_json()
-    parcelle_id = data.get('parcelleId')
-    position_x = data.get('x')
-    position_y = data.get('y')
-    
-    position = ParcellePosition.query.filter_by(parcelle_config_id=parcelle_id).first()
-    
-    if position:
-        position.position_x = position_x
-        position.position_y = position_y
-    else:
-        position = ParcellePosition(
-            parcelle_config_id=parcelle_id,
-            position_x=position_x,
-            position_y=position_y
-        )
-        db.session.add(position)
-    
-    db.session.commit()
-    return jsonify({"message": "Position mise à jour"})
+    try:
+        data = request.get_json()
+        parcelle_id = data.get('parcelleId')
+        x = data.get('x', 0)  # Valeur par défaut 0
+        y = data.get('y', 0)  # Valeur par défaut 0
+
+        if parcelle_id is None:
+            return jsonify({"error": "parcelleId manquant"}), 400
+
+        # Vérifier si la parcelle existe
+        parcelle = ParcelleConfig.query.get(parcelle_id)
+        if not parcelle:
+            return jsonify({"error": "Parcelle non trouvée"}), 404
+
+        # Mettre à jour ou créer la position
+        position = ParcellePosition.query.filter_by(parcelle_config_id=parcelle_id).first()
+        if position:
+            position.position_x = x
+            position.position_y = y
+        else:
+            position = ParcellePosition(
+                parcelle_config_id=parcelle_id,
+                position_x=x,
+                position_y=y
+            )
+            db.session.add(position)
+
+        db.session.commit()
+        return jsonify({"message": "Position mise à jour avec succès"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/parcelles/positions', methods=['GET'])
 def get_parcelle_positions():

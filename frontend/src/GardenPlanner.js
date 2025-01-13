@@ -44,15 +44,20 @@ function GardenPlanner() {
   useEffect(() => {
     const loadPositions = async () => {
       try {
-        const response = await axios.get('http://localhost:8001/parcelles/positions');
+        // Charger d'abord les positions
+        const positionsResponse = await axios.get('http://localhost:8001/parcelles/positions');
         const positions = {};
-        response.data.forEach(pos => {
-          positions[pos.parcelle_config_id] = { 
-            row: pos.position_y, 
-            col: pos.position_x 
+        positionsResponse.data.forEach(pos => {
+          positions[pos.parcelle_config_id] = {
+            row: pos.position_y,
+            col: pos.position_x
           };
         });
         setParcellePositions(positions);
+
+        // Ensuite charger les parcelles
+        const parcellesResponse = await axios.get('http://localhost:8001/parcelles');
+        setParcelles(parcellesResponse.data);
       } catch (error) {
         console.error('Erreur chargement positions:', error);
       }
@@ -221,8 +226,13 @@ function GardenPlanner() {
         x: newCol,
         y: newRow
       });
+
+      // Sélectionner automatiquement la parcelle après le drag & drop
+      handleParcelleSelect(parcelleId);
+
     } catch (error) {
       console.error('Erreur sauvegarde position:', error);
+      setParcellePositions(prev => ({ ...prev }));
       alert('Erreur lors de la sauvegarde de la position');
     }
   };
