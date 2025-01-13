@@ -13,6 +13,7 @@ CORS(app)
 # Initialisation de la base de données
 db = SQLAlchemy(app)
 
+
 # Modèle de la table Culture
 class Culture(db.Model):
     __tablename__ = 'culture'
@@ -46,7 +47,14 @@ class Parcelle(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     row = db.Column(db.Integer, nullable=False)
     col = db.Column(db.Integer, nullable=False)
-    culture_nom = db.Column(db.String(50), nullable=True)
+    culture_emoji = db.Column(db.String(10), nullable=True)  # Stockage de l'emoji
+
+    def to_dict(self):
+        return {
+            'row': self.row,
+            'col': self.col,
+            'culture_emoji': self.culture_emoji
+        }
 
 # Route pour récupérer toutes les cultures
 @app.route('/cultures', methods=['GET'])
@@ -84,21 +92,25 @@ def delete_culture(id):
 @app.route('/parcelles', methods=['GET'])
 def get_parcelles():
     parcelles = Parcelle.query.all()
-    return jsonify([
-        {"row": parcelle.row, "col": parcelle.col, "culture_nom": parcelle.culture_nom}
-        for parcelle in parcelles
-    ])
+    return jsonify([parcelle.to_dict() for parcelle in parcelles])
 
 # Route pour mettre à jour une parcelle
 @app.route('/parcelles', methods=['POST'])
 def update_parcelle():
     data = request.get_json()
-    parcelle = Parcelle.query.filter_by(row=data['row'], col=data['col']).first()
+    parcelle = Parcelle.query.filter_by(
+        row=data['row'], 
+        col=data['col']
+    ).first()
 
     if parcelle:
-        parcelle.culture_nom = data['culture_nom']
+        parcelle.culture_emoji = data['culture_emoji']
     else:
-        parcelle = Parcelle(row=data['row'], col=data['col'], culture_nom=data['culture_nom'])
+        parcelle = Parcelle(
+            row=data['row'],
+            col=data['col'],
+            culture_emoji=data['culture_emoji']
+        )
         db.session.add(parcelle)
 
     db.session.commit()

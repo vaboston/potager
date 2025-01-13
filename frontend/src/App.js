@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import CalendarTable from './CalendarTable';
 import AddCulture from './AddCulture';
+import GardenPlanner from './GardenPlanner';
 
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
       <Routes>
         <Route path="/" element={<CalendarTable />} />
         <Route path="/add-culture" element={<AddCulture />} />
+        <Route path="/organisation" element={<GardenPlanner />} />
       </Routes>
     </Router>
   );
