@@ -71,7 +71,17 @@ function GardenPlanner() {
   // Charger les versions au démarrage
   useEffect(() => {
     axios.get('http://localhost:8001/versions')
-      .then(response => setVersions(response.data))
+      .then(response => {
+        setVersions(response.data);
+        // Trouver la version la plus récente
+        if (response.data.length > 0) {
+          const mostRecent = response.data.reduce((prev, current) => {
+            return new Date(current.created_at) > new Date(prev.created_at) ? current : prev;
+          });
+          setLastSelectedVersion(mostRecent.id);
+          handleVersionSelect(mostRecent); // Charger automatiquement la version la plus récente
+        }
+      })
       .catch(error => console.error('Erreur chargement versions:', error));
   }, []);
 
@@ -99,32 +109,59 @@ function GardenPlanner() {
     loadInitialData();
   }, []);
 
+  // Charger la taille du potager au démarrage
+  useEffect(() => {
+    axios.get('http://localhost:8001/potager/size')
+      .then(response => {
+        if (response.data) {
+          setPotagerSize({
+            rows: response.data.rows || 10,
+            cols: response.data.cols || 10
+          });
+        }
+      })
+      .catch(error => console.error('Erreur chargement taille potager:', error));
+  }, []);
+
+  // Modifier la fonction de changement de taille
+  const handlePotagerSizeChange = (type, value) => {
+    const newSize = { ...potagerSize, [type]: parseInt(value) || 1 };
+    setPotagerSize(newSize);
+    
+    // Sauvegarder la nouvelle taille
+    axios.post('http://localhost:8001/potager/size', newSize)
+      .catch(error => console.error('Erreur sauvegarde taille potager:', error));
+  };
+
   const handleCellClick = async (index) => {
-    if (selectedCrop && selectedParcelle) {
-      const row = Math.floor(index / gridSize.cols);
-      const col = index % gridSize.cols;
-      
-      try {
-        console.log('Mise à jour de la cellule:', { row, col, emoji: selectedCrop });
+    if (!selectedParcelle) {
+        alert('Veuillez sélectionner une parcelle');
+        return;
+    }
+
+    const row = Math.floor(index / gridSize.cols);
+    const col = index % gridSize.cols;
+    
+    try {
+        // Si la case contient déjà une culture, on l'efface
+        const currentEmoji = grid[index];
+        const newEmoji = currentEmoji ? '' : selectedCrop;
+
         const response = await axios.post('http://localhost:8001/parcelles', {
-          parcelle_id: parseInt(selectedParcelle),
-          row: row,
-          col: col,
-          culture_emoji: selectedCrop
+            parcelle_id: parseInt(selectedParcelle),
+            row: row,
+            col: col,
+            culture_emoji: newEmoji
         });
 
         if (response.data.message) {
-          const newGrid = [...grid];
-          newGrid[index] = selectedCrop;
-          console.log('Grille mise à jour:', newGrid);
-          setGrid(newGrid);
+            const newGrid = [...grid];
+            newGrid[index] = newEmoji;
+            setGrid(newGrid);
         }
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error);
-        alert('Erreur lors de la sauvegarde de la culture');
-      }
-    } else {
-      alert('Veuillez sélectionner une parcelle et une culture');
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour:', error);
+        alert('Erreur lors de la mise à jour de la culture');
     }
   };
 
@@ -275,43 +312,57 @@ function GardenPlanner() {
         overflowY: 'auto'
       }}>
         <h2>Versions sauvegardées</h2>
-        {versions.map((version) => (
-          <div
-            key={version.id}
-            style={{
-              padding: '10px',
-              margin: '10px 0',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              backgroundColor: lastSelectedVersion === version.id ? '#e8f5e9' : 'white',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}
-            onClick={() => onSelect(version)}
-          >
-            <div>
-              <strong>{version.name || 'Sans nom'}</strong>
-              <div style={{ fontSize: '0.8em', color: '#666' }}>
-                Créée le {new Date(version.created_at).toLocaleString()}
+        {versions.map((version) => {
+          const isCurrentVersion = version.id === lastSelectedVersion;
+          return (
+            <div
+              key={version.id}
+              style={{
+                padding: '10px',
+                margin: '10px 0',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                backgroundColor: isCurrentVersion ? '#e8f5e9' : 'white',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+              onClick={() => onSelect(version)}
+            >
+              <div>
+                <strong>{version.name || 'Sans nom'}</strong>
+                <div style={{ fontSize: '0.8em', color: '#666' }}>
+                  Créée le {new Date(version.created_at).toLocaleString()}
+                </div>
+                {isCurrentVersion && (
+                  <div style={{ 
+                    marginTop: '5px',
+                    color: '#4CAF50',
+                    fontWeight: 'bold',
+                    fontSize: '0.9em'
+                  }}>
+                    Version courante ✓
+                  </div>
+                )}
               </div>
-              {lastSelectedVersion === version.id && (
-                <span style={{ 
-                  marginLeft: '10px',
-                  color: '#4CAF50',
-                  fontWeight: 'bold'
-                }}>
-                  (Version courante)
-                </span>
-              )}
-              {version.is_current && (
-                <span style={{ marginLeft: '10px' }}>⏰</span>
-              )}
             </div>
-          </div>
-        ))}
-        <button onClick={onClose} style={{ marginTop: '20px' }}>Fermer</button>
+          );
+        })}
+        <button 
+          onClick={onClose} 
+          style={{ 
+            marginTop: '20px',
+            padding: '8px 16px',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Fermer
+        </button>
       </div>
     </div>
   );
@@ -335,6 +386,25 @@ function GardenPlanner() {
     setShowVersionsModal(false);
   };
 
+  const handleDeleteParcelle = async () => {
+    if (!selectedParcelle) {
+      alert('Veuillez sélectionner une parcelle à supprimer');
+      return;
+    }
+
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette parcelle ?')) {
+      try {
+        await axios.delete(`http://localhost:8001/parcelles/${selectedParcelle}`);
+        setParcelles(parcelles.filter(p => p.id !== selectedParcelle));
+        setSelectedParcelle(null);
+        setGrid(Array(gridSize.rows * gridSize.cols).fill(''));
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression de la parcelle');
+      }
+    }
+  };
+
   return (
     <div style={{ padding: '20px', display: 'flex', gap: '20px' }}>
       {/* Partie gauche avec la grille et les contrôles */}
@@ -342,14 +412,26 @@ function GardenPlanner() {
         <h1>Organisation du Potager</h1>
         
         {/* Boutons pour gérer les versions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
+          <button 
+            onClick={handleDeleteParcelle} 
+            style={{ 
+              fontSize: '20px',
+              backgroundColor: selectedParcelle ? '#ff4444' : '#cccccc',
+              color: 'white',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '5px',
+              cursor: selectedParcelle ? 'pointer' : 'not-allowed'
+            }}
+            disabled={!selectedParcelle}
+          >
+            ❌ Supp. parcelle
+          </button>
           <button onClick={createVersion} style={{ fontSize: '20px' }}>
             🔄 Créer une version
           </button>
-          <button 
-            onClick={() => setShowVersionsModal(true)} 
-            style={{ fontSize: '20px' }}
-          >
+          <button onClick={() => setShowVersionsModal(true)} style={{ fontSize: '20px' }}>
             📜 Liste des versions
           </button>
         </div>
@@ -499,7 +581,7 @@ function GardenPlanner() {
           <input
             type="number"
             value={potagerSize.rows}
-            onChange={(e) => setPotagerSize(prev => ({ ...prev, rows: parseInt(e.target.value) || 1 }))}
+            onChange={(e) => handlePotagerSizeChange('rows', e.target.value)}
             min="1"
             max="20"
             style={{ width: '60px', marginRight: '10px' }}
@@ -508,7 +590,7 @@ function GardenPlanner() {
           <input
             type="number"
             value={potagerSize.cols}
-            onChange={(e) => setPotagerSize(prev => ({ ...prev, cols: parseInt(e.target.value) || 1 }))}
+            onChange={(e) => handlePotagerSizeChange('cols', e.target.value)}
             min="1"
             max="20"
             style={{ width: '60px', marginLeft: '10px' }}
@@ -594,18 +676,21 @@ function GardenPlanner() {
                   border: '1px solid #ccc',
                   borderRadius: '4px',
                   padding: '4px',
-                  fontSize: '10px',
                   cursor: 'pointer',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   textAlign: 'center'
                 }}
                 onClick={() => handleParcelleSelect(parcelle.id)}
               >
-                {parcelle.nom}
-                <br />
-                <small>{parcelle.rows}×{parcelle.cols}</small>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>
+                  {parcelle.nom}
+                </div>
+                <div style={{ fontSize: '10px', opacity: 0.8 }}>
+                  {parcelle.rows}×{parcelle.cols}
+                </div>
               </div>
             ))}
           </div>

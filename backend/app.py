@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from datetime import datetime
 
 # Initialisation de Flask
 app = Flask(__name__)
@@ -113,11 +114,24 @@ class Version(db.Model):
             'is_current': self.is_current
         }
 
+# Après les autres modèles, avant les routes
+class PotagerConfig(db.Model):
+    __tablename__ = 'potager_config'
+    id = db.Column(db.Integer, primary_key=True)
+    rows = db.Column(db.Integer, nullable=False, default=10)
+    cols = db.Column(db.Integer, nullable=False, default=10)
+
+    def to_dict(self):
+        return {
+            'rows': self.rows,
+            'cols': self.cols
+        }
+
 # Route pour récupérer toutes les cultures
 @app.route('/cultures', methods=['GET'])
 def get_cultures():
     # Exclure l'allée de la liste des cultures retournées
-    cultures = Culture.query.filter(Culture.nom != "Allée").all()
+    cultures = Culture.query.all()
     return jsonify([culture.to_dict() for culture in cultures])
 
 # Route pour ajouter une culture
@@ -162,9 +176,15 @@ def update_parcelle():
         col=data['col']
     ).first()
 
-    if parcelle:
+    # Si une parcelle existe déjà à cet emplacement et qu'on reçoit un emoji vide,
+    # on supprime la culture de cette case
+    if parcelle and data.get('culture_emoji') == '':
+        db.session.delete(parcelle)
+    # Si une parcelle existe, on met à jour son emoji
+    elif parcelle:
         parcelle.culture_emoji = data['culture_emoji']
-    else:
+    # Si aucune parcelle n'existe et qu'on a un emoji, on en crée une nouvelle
+    elif data.get('culture_emoji'):
         parcelle = Parcelle(
             parcelle_config_id=data['parcelle_id'],
             row=data['row'],
@@ -286,26 +306,106 @@ def get_versions():
     versions = Version.query.order_by(Version.created_at.desc()).all()
     return jsonify([version.to_dict() for version in versions])
 
+# Ajouter ces nouvelles routes avant la fonction init_default_data()
+@app.route('/potager/size', methods=['GET'])
+def get_potager_size():
+    config = PotagerConfig.query.first()
+    if not config:
+        config = PotagerConfig()  # Utilise les valeurs par défaut
+        db.session.add(config)
+        db.session.commit()
+    return jsonify(config.to_dict())
+
+@app.route('/potager/size', methods=['POST'])
+def update_potager_size():
+    data = request.get_json()
+    config = PotagerConfig.query.first()
+    
+    if not config:
+        config = PotagerConfig()
+        db.session.add(config)
+    
+    config.rows = max(1, min(data.get('rows', 10), 20))  # Limite entre 1 et 20
+    config.cols = max(1, min(data.get('cols', 10), 20))  # Limite entre 1 et 20
+    
+    db.session.commit()
+    return jsonify(config.to_dict())
+
+# Modifier la fonction init_default_data pour inclure la configuration du potager
 def init_default_data():
-    # Vérifier si l'allée existe déjà
-    allee = Culture.query.filter_by(nom="Allée").first()
-    if not allee:
+    print("Démarrage de l'initialisation des données...")
+    
+    # Configuration par défaut du potager
+    default_config = PotagerConfig.query.first()
+    if not default_config:
+        print("Création de la configuration par défaut du potager...")
+        default_config = PotagerConfig(rows=10, cols=10)
+        db.session.add(default_config)
+        db.session.commit()
+        print("Configuration du potager créée.")
+    
+    # Forcer la suppression de l'allée existante si elle existe
+    try:
+        Culture.query.filter_by(nom="Allée").delete()
+        db.session.commit()
+        print("Ancienne allée supprimée.")
+    except Exception as e:
+        print(f"Erreur lors de la suppression de l'ancienne allée: {str(e)}")
+        db.session.rollback()
+
+    # Créer une nouvelle allée
+    print("Création de l'allée...")
+    try:
         allee_culture = Culture(
             nom="Allée",
-            date_semis="1970-01-01",
+            date_semis=datetime.strptime("1970-01-01", "%Y-%m-%d"),
             type_culture="pleine terre",
-            date_recolte="2100-01-01",  # Date lointaine car c'est permanent
+            date_recolte=datetime.strptime("2100-01-01", "%Y-%m-%d"),
             commentaire="Allée de passage",
-            couleur="#8B4513",  # Marron
-            emoji="⬛"  # Carré noir (apparaîtra en marron avec la couleur)
+            couleur="#8B4513",
+            emoji="⬛"
         )
         db.session.add(allee_culture)
         db.session.commit()
         print("Allée créée avec succès!")
+        
+        # Vérification immédiate
+        verification = Culture.query.filter_by(nom="Allée").first()
+        if verification:
+            print(f"Vérification: Allée trouvée avec l'ID {verification.id}")
+        else:
+            print("Erreur: L'allée n'a pas été créée correctement")
+            
+    except Exception as e:
+        print(f"Erreur lors de la création de l'allée: {str(e)}")
+        db.session.rollback()
+
+    print("Configuration initiale terminée!")
+
+# Ajouter cette nouvelle route après les autres routes de parcelles
+@app.route('/parcelles/<int:id>', methods=['DELETE'])
+def delete_parcelle(id):
+    try:
+        # Supprimer d'abord toutes les positions associées
+        ParcellePosition.query.filter_by(parcelle_config_id=id).delete()
+        
+        # Supprimer toutes les cultures de la parcelle
+        Parcelle.query.filter_by(parcelle_config_id=id).delete()
+        
+        # Supprimer la configuration de la parcelle
+        parcelle = ParcelleConfig.query.get_or_404(id)
+        db.session.delete(parcelle)
+        db.session.commit()
+        
+        return jsonify({"message": "Parcelle supprimée avec succès"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 # Création de la base de données
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        print("Tables créées.")
         init_default_data()
-    app.run(port=8001, debug=True)
+    app.run(host='0.0.0.0', port=8001, debug=True)

@@ -14,7 +14,11 @@ function CalendarTable() {
   // Charger les cultures depuis l'API
   useEffect(() => {
     axios.get('http://localhost:8001/cultures')
-      .then(response => setCultures(response.data))
+      .then(response => {
+        // Filtrer pour exclure la culture "Allée"
+        const filteredCultures = response.data.filter(culture => culture.nom !== "Allée");
+        setCultures(filteredCultures);
+      })
       .catch(error => console.error('Erreur lors du chargement des cultures', error));
   }, []);
 
