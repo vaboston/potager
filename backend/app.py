@@ -42,15 +42,34 @@ class Culture(db.Model):
         }
 
 # Modèle pour l'organisation du potager (parcelles)
-class Parcelle(db.Model):
-    __tablename__ = 'parcelle'
+class ParcelleConfig(db.Model):
+    __tablename__ = 'parcelle_config'
     id = db.Column(db.Integer, primary_key=True)
-    row = db.Column(db.Integer, nullable=False)
-    col = db.Column(db.Integer, nullable=False)
-    culture_emoji = db.Column(db.String(10), nullable=True)  # Stockage de l'emoji
+    nom = db.Column(db.String(50), nullable=False)
+    rows = db.Column(db.Integer, nullable=False)
+    cols = db.Column(db.Integer, nullable=False)
+    parcelles = db.relationship('Parcelle', backref='config', lazy=True)
 
     def to_dict(self):
         return {
+            'id': self.id,
+            'nom': self.nom,
+            'rows': self.rows,
+            'cols': self.cols
+        }
+
+class Parcelle(db.Model):
+    __tablename__ = 'parcelle'
+    id = db.Column(db.Integer, primary_key=True)
+    parcelle_config_id = db.Column(db.Integer, db.ForeignKey('parcelle_config.id'), nullable=False)
+    row = db.Column(db.Integer, nullable=False)
+    col = db.Column(db.Integer, nullable=False)
+    culture_emoji = db.Column(db.String(10), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'parcelle_config_id': self.parcelle_config_id,
             'row': self.row,
             'col': self.col,
             'culture_emoji': self.culture_emoji
@@ -90,16 +109,17 @@ def delete_culture(id):
 
 # Route pour récupérer les parcelles sauvegardées
 @app.route('/parcelles', methods=['GET'])
-def get_parcelles():
-    parcelles = Parcelle.query.all()
-    return jsonify([parcelle.to_dict() for parcelle in parcelles])
+def get_all_parcelles():
+    parcelles_config = ParcelleConfig.query.all()
+    return jsonify([p.to_dict() for p in parcelles_config])
 
 # Route pour mettre à jour une parcelle
 @app.route('/parcelles', methods=['POST'])
 def update_parcelle():
     data = request.get_json()
     parcelle = Parcelle.query.filter_by(
-        row=data['row'], 
+        parcelle_config_id=data['parcelle_id'],
+        row=data['row'],
         col=data['col']
     ).first()
 
@@ -107,6 +127,7 @@ def update_parcelle():
         parcelle.culture_emoji = data['culture_emoji']
     else:
         parcelle = Parcelle(
+            parcelle_config_id=data['parcelle_id'],
             row=data['row'],
             col=data['col'],
             culture_emoji=data['culture_emoji']
@@ -115,6 +136,61 @@ def update_parcelle():
 
     db.session.commit()
     return jsonify({"message": "Parcelle mise à jour avec succès"})
+
+# Route pour créer une parcelle
+@app.route('/parcelles/create', methods=['POST'])
+def create_parcelle():
+    data = request.get_json()
+    
+    if not data.get('nom'):
+        return jsonify({"error": "Le nom est requis"}), 400
+        
+    rows = max(1, min(data.get('rows', 1), 20))
+    cols = max(1, min(data.get('cols', 1), 20))
+    
+    new_parcelle_config = ParcelleConfig(
+        nom=data['nom'],
+        rows=rows,
+        cols=cols
+    )
+    db.session.add(new_parcelle_config)
+    db.session.commit()
+    
+    return jsonify(new_parcelle_config.to_dict())
+
+# Route pour récupérer une parcelle
+@app.route('/parcelles/<int:id>', methods=['GET'])
+def get_parcelle(id):
+    try:
+        parcelle_config = ParcelleConfig.query.get_or_404(id)
+        parcelles = Parcelle.query.filter_by(parcelle_config_id=id).all()
+        
+        # Créer une grille vide
+        grid = [''] * (parcelle_config.rows * parcelle_config.cols)
+        
+        # Remplir la grille avec les cultures existantes
+        for p in parcelles:
+            index = p.row * parcelle_config.cols + p.col
+            if 0 <= index < len(grid):
+                # S'assurer que l'emoji est une chaîne UTF-8 valide
+                emoji = p.culture_emoji if p.culture_emoji else ''
+                grid[index] = emoji
+                print(f"Ajout de l'emoji {emoji} (type: {type(emoji)}) à l'index {index}")
+        
+        response_data = {
+            'id': parcelle_config.id,
+            'nom': parcelle_config.nom,
+            'rows': parcelle_config.rows,
+            'cols': parcelle_config.cols,
+            'grid': grid
+        }
+        
+        print(f"Grille finale: {grid}")
+        return jsonify(response_data)
+
+    except Exception as e:
+        print(f"Erreur: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # Création de la base de données
 if __name__ == "__main__":
