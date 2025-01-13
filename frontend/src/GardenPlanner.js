@@ -150,8 +150,8 @@ function GardenPlanner() {
     const col = index % gridSize.cols;
     
     try {
-      const currentCell = grid[index];
-      const newEmoji = currentCell?.emoji ? '' : selectedCrop?.emoji;
+      const currentEmoji = grid[index];
+      const newEmoji = currentEmoji ? '' : selectedCrop?.emoji;
 
       const response = await axios.post('http://localhost:8001/parcelles', {
         parcelle_id: parseInt(selectedParcelle),
@@ -161,17 +161,13 @@ function GardenPlanner() {
         culture_id: selectedCrop?.id
       });
 
-      // Mettre à jour la grille localement
-      const newGrid = [...grid];
-      newGrid[index] = {
-        emoji: newEmoji,
-        culture_id: newEmoji ? selectedCrop?.id : null
-      };
-      setGrid(newGrid);
-
+      if (response.data.message) {
+        const newGrid = [...grid];
+        newGrid[index] = newEmoji;
+        setGrid(newGrid);
+      }
     } catch (error) {
       console.error('Erreur lors de la mise à jour de la parcelle:', error);
-      alert('Erreur lors de la mise à jour de la parcelle');
     }
   };
 
@@ -721,35 +717,24 @@ function GardenPlanner() {
             }}
           >
             {grid.map((cell, index) => (
-              <div
-                key={index}
+              <div 
+                key={index} 
+                className="simple-cell"
                 onClick={() => handleCellClick(index)}
-                onMouseEnter={(e) => {
-                  if (cell.culture_id) {
-                    const culture = crops.find(c => c.id === cell.culture_id);
-                    if (culture) {
-                      setHoverTooltip({
-                        visible: true,
-                        text: culture.nom,
-                        x: e.clientX + 10,
-                        y: e.clientY + 10
-                      });
-                    }
-                  }
-                }}
-                onMouseLeave={() => setHoverTooltip({ ...hoverTooltip, visible: false })}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  border: '1px solid #ccc',
+                onMouseEnter={(e) => handleCellHover(e, cell)}
+                onMouseLeave={handleCellLeave}
+                style={{ 
+                  fontSize: '24px',
+                  width: '50px',
+                  height: '50px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontSize: '20px'
+                  border: '1px solid #ccc',
+                  backgroundColor: selectedParcelle ? 'white' : '#f0f0f0'
                 }}
               >
-                {cell.emoji}
+                {cell}
               </div>
             ))}
           </div>
@@ -806,16 +791,6 @@ function GardenPlanner() {
                        col < pos.col + p.cols;
               });
 
-              // Récupérer le contenu de la cellule
-              const cellContent = (() => {
-                if (!parcelle) return '';
-                const gridIndex = (row - (parcellePositions[parcelle.id]?.row || 0)) * parcelle.cols + 
-                                 (col - (parcellePositions[parcelle.id]?.col || 0));
-                const cellData = parcelleGrids[parcelle.id]?.[gridIndex] || '';
-                // Retourner uniquement l'emoji si c'est un objet
-                return typeof cellData === 'object' ? cellData.emoji || '' : cellData;
-              })();
-
               return (
                 <div
                   key={index}
@@ -824,17 +799,34 @@ function GardenPlanner() {
                     height: '30px',
                     backgroundColor: parcelle ? (selectedParcelle === parcelle.id ? '#4CAF50' : '#c8e6c9') : '#f0f0f0',
                     border: '1px solid #ccc',
+                    cursor: parcelle ? 'move' : 'default',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: parcelle ? 'pointer' : 'default',
-                    fontSize: '20px'
+                    fontSize: '16px',
+                    userSelect: 'none'
                   }}
-                  onClick={() => parcelle && handleCellClick(index)}
-                  onMouseEnter={(e) => handleCellHover(e, index)}
-                  onMouseLeave={handleCellLeave}
+                  draggable={!!parcelle}
+                  onDragStart={(e) => {
+                    if (parcelle) {
+                      e.dataTransfer.setData('parcelleId', parcelle.id.toString());
+                    }
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const parcelleId = parseInt(e.dataTransfer.getData('parcelleId'));
+                    handleParcelleDrag(parcelleId, row, col);
+                  }}
+                  onClick={() => parcelle && handleParcelleSelect(parcelle.id)}
                 >
-                  {cellContent}
+                  {parcelle && parcelleGrids[parcelle.id] && (() => {
+                    const pos = parcellePositions[parcelle.id] || { row: 0, col: 0 };
+                    const relativeRow = row - pos.row;
+                    const relativeCol = col - pos.col;
+                    const gridIndex = (relativeRow * parcelle.cols) + relativeCol;
+                    return parcelleGrids[parcelle.id][gridIndex] || '';
+                  })()}
                 </div>
               );
             })}
