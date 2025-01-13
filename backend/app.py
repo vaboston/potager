@@ -73,12 +73,13 @@ class ParcelleConfig(db.Model):
         }
 
 class Parcelle(db.Model):
-    __tablename__ = 'parcelle'
+    __tablename__ = 'parcelles'
     id = db.Column(db.Integer, primary_key=True)
     parcelle_config_id = db.Column(db.Integer, db.ForeignKey('parcelle_config.id'), nullable=False)
     row = db.Column(db.Integer, nullable=False)
     col = db.Column(db.Integer, nullable=False)
-    culture_emoji = db.Column(db.String(10), nullable=True)
+    culture_emoji = db.Column(db.String(10))
+    culture_id = db.Column(db.Integer, db.ForeignKey('culture.id'))
 
     def to_dict(self):
         return {
@@ -86,7 +87,8 @@ class Parcelle(db.Model):
             'parcelle_config_id': self.parcelle_config_id,
             'row': self.row,
             'col': self.col,
-            'culture_emoji': self.culture_emoji
+            'culture_emoji': self.culture_emoji,
+            'culture_id': self.culture_id
         }
 
 # Ajouter ce nouveau modèle après les autres modèles
@@ -199,25 +201,23 @@ def update_parcelle():
         col=data['col']
     ).first()
 
-    # Si une parcelle existe déjà à cet emplacement et qu'on reçoit un emoji vide,
-    # on supprime la culture de cette case
     if parcelle and data.get('culture_emoji') == '':
         db.session.delete(parcelle)
-    # Si une parcelle existe, on met à jour son emoji
     elif parcelle:
         parcelle.culture_emoji = data['culture_emoji']
-    # Si aucune parcelle n'existe et qu'on a un emoji, on en crée une nouvelle
+        parcelle.culture_id = data.get('culture_id')
     elif data.get('culture_emoji'):
         parcelle = Parcelle(
             parcelle_config_id=data['parcelle_id'],
             row=data['row'],
             col=data['col'],
-            culture_emoji=data['culture_emoji']
+            culture_emoji=data['culture_emoji'],
+            culture_id=data.get('culture_id')
         )
         db.session.add(parcelle)
 
     db.session.commit()
-    return jsonify({"message": "Parcelle mise à jour avec succès"})
+    return jsonify({"message": "Parcelle mise à jour avec succès!"})
 
 # Route pour créer une parcelle
 @app.route('/parcelles/create', methods=['POST'])
@@ -248,16 +248,27 @@ def get_parcelle(id):
         parcelles = Parcelle.query.filter_by(parcelle_config_id=id).all()
         
         # Créer une grille vide
-        grid = [''] * (parcelle_config.rows * parcelle_config.cols)
+        grid = []
+        for _ in range(parcelle_config.rows * parcelle_config.cols):
+            grid.append({
+                'emoji': '',
+                'culture': None
+            })
         
-        # Remplir la grille avec les cultures existantes
+        # Remplir la grille avec les emojis et les informations des cultures
         for p in parcelles:
             index = p.row * parcelle_config.cols + p.col
             if 0 <= index < len(grid):
-                # S'assurer que l'emoji est une chaîne UTF-8 valide
-                emoji = p.culture_emoji if p.culture_emoji else ''
-                grid[index] = emoji
-                print(f"Ajout de l'emoji {emoji} (type: {type(emoji)}) à l'index {index}")
+                culture_info = None
+                if p.culture_id:
+                    culture = Culture.query.get(p.culture_id)
+                    if culture:
+                        culture_info = culture.to_dict()
+                
+                grid[index] = {
+                    'emoji': p.culture_emoji if p.culture_emoji else '',
+                    'culture': culture_info
+                }
         
         response_data = {
             'id': parcelle_config.id,
@@ -267,11 +278,9 @@ def get_parcelle(id):
             'grid': grid
         }
         
-        print(f"Grille finale: {grid}")
         return jsonify(response_data)
-
+        
     except Exception as e:
-        print(f"Erreur: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # Modifier la route pour mettre à jour la position d'une parcelle
