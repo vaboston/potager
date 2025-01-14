@@ -515,9 +515,12 @@ def update_culture(id):
 def get_culture(id):
     try:
         culture = Culture.query.get_or_404(id)
-        return jsonify(culture.to_dict()), 200
+        return jsonify({
+            'id': culture.id,
+            'nom': culture.nom
+        })
     except Exception as e:
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": str(e)}), 500
 
 # Modifions la route pour récupérer une version spécifique
 @app.route('/versions/<int:id>', methods=['GET'])

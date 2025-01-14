@@ -145,25 +145,25 @@ function GardenPlanner() {
       alert('Veuillez sélectionner une parcelle');
       return;
     }
-
+  
     const row = Math.floor(index / gridSize.cols);
     const col = index % gridSize.cols;
-    
+  
     try {
-      const currentEmoji = grid[index];
-      const newEmoji = currentEmoji ? '' : selectedCrop?.emoji;
-
+      const currentCell = grid[index];
+      const newCellData = currentCell ? '' : `${selectedCrop?.emoji},${selectedCrop?.id},${selectedCrop?.nom}`; // Ajout de l'emoji, l'ID et le nom
+  
       const response = await axios.post('http://localhost:8001/parcelles', {
         parcelle_id: parseInt(selectedParcelle),
         row: row,
         col: col,
-        culture_emoji: newEmoji,
+        culture_emoji: newCellData,
         culture_id: selectedCrop?.id
       });
-
+  
       if (response.data.message) {
         const newGrid = [...grid];
-        newGrid[index] = newEmoji;
+        newGrid[index] = selectedCrop?.emoji || ''; // Stocker uniquement l'emoji
         setGrid(newGrid);
       }
     } catch (error) {
@@ -171,17 +171,32 @@ function GardenPlanner() {
     }
   };
 
-  const handleCellHover = (e, cell) => {
-    if (cell) {
-      const culture = crops.find(c => c.emoji === cell);
-      if (culture) {
-        setHoverTooltip({
-          visible: true,
-          text: culture.nom,
-          x: e.clientX + 10,
-          y: e.clientY + 10
-        });
-      }
+  const handleCellHover = async (e, cellData) => {
+    if (!cellData) {
+      setHoverTooltip({ visible: false, x: 0, y: 0, text: '' });
+      return;
+    }
+  
+    const [emoji, id, nom] = cellData.split(',');
+  
+    try {
+      const response = await axios.get(`http://localhost:8001/cultures/${id}`);
+      const { nom: nomCulture } = response.data;
+  
+      setHoverTooltip({
+        visible: true,
+        x: e.clientX + 10,
+        y: e.clientY + 10,
+        text: `${emoji} ${nomCulture}`
+      });
+    } catch (error) {
+      console.error('Erreur lors de la récupération du nom de la culture:', error);
+      setHoverTooltip({
+        visible: true,
+        x: e.clientX + 10,
+        y: e.clientY + 10,
+        text: `${emoji} ${nom}`
+      });
     }
   };
 
@@ -734,7 +749,7 @@ function GardenPlanner() {
                   backgroundColor: selectedParcelle ? 'white' : '#f0f0f0'
                 }}
               >
-                {cell}
+                {cell ? cell.split(',')[0] : ''} {/* Afficher uniquement l'emoji */}
               </div>
             ))}
           </div>
@@ -820,13 +835,15 @@ function GardenPlanner() {
                   }}
                   onClick={() => parcelle && handleParcelleSelect(parcelle.id)}
                 >
-                  {parcelle && parcelleGrids[parcelle.id] && (() => {
-                    const pos = parcellePositions[parcelle.id] || { row: 0, col: 0 };
-                    const relativeRow = row - pos.row;
-                    const relativeCol = col - pos.col;
-                    const gridIndex = (relativeRow * parcelle.cols) + relativeCol;
-                    return parcelleGrids[parcelle.id][gridIndex] || '';
-                  })()}
+                {parcelle && parcelleGrids[parcelle.id] && (() => {
+  const pos = parcellePositions[parcelle.id] || { row: 0, col: 0 };
+  const relativeRow = row - pos.row;
+  const relativeCol = col - pos.col;
+  const gridIndex = (relativeRow * parcelle.cols) + relativeCol;
+  const cellData = parcelleGrids[parcelle.id][gridIndex];
+
+  return cellData ? cellData.split(',')[0] : ''; // Afficher uniquement l'emoji
+})()}
                 </div>
               );
             })}
