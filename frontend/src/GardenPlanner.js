@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -20,6 +20,8 @@ function GardenPlanner() {
   const [parcelleGrids, setParcelleGrids] = useState({});
   const [currentVersion, setCurrentVersion] = useState(null);
   const [hoverTooltip, setHoverTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
+  const [showCropSlider, setShowCropSlider] = useState(false);
+  const cropSliderRef = useRef(null);
 
   // Gestion du changement de taille
   const handleSizeChange = (type, value) => {
@@ -545,6 +547,19 @@ function GardenPlanner() {
     }
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (cropSliderRef.current && !cropSliderRef.current.contains(event.target)) {
+        setShowCropSlider(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
     <div>
       {/* Contenu principal */}
@@ -630,46 +645,35 @@ function GardenPlanner() {
             </div>
 
             {/* Section liste des cultures */}
-            <h3>Cultures disponibles</h3>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              {crops.map((crop) => (
-                <button
-                  key={crop.id}
-                  onClick={() => setSelectedCrop({
-                    id: crop.id,
-                    emoji: crop.emoji,
-                    nom: crop.nom
-                  })}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    border: selectedCrop?.id === crop.id ? '2px solid #4CAF50' : '1px solid #ddd',
-                    borderRadius: '4px',
-                    backgroundColor: selectedCrop?.id === crop.id ? '#e8f5e9' : 'white',
-                    cursor: 'pointer',
-                    width: 'fit-content',
-                    textAlign: 'left',
-                    margin: '0'
-                  }}
-                >
-                  <span style={{ marginRight: '8px', fontSize: '1.2em' }}>{crop.emoji}</span>
-                  <div style={{ display: 'inline-block' }}>
-                    <div style={{ fontWeight: 'bold', display: 'inline' }}>{crop.nom}</div>
-                    <small style={{ 
-                      color: '#666',
-                      marginLeft: '8px',
-                      display: 'inline'
-                    }}>
-                      ({crop.usage_count || 0})
-                    </small>
+            <div style={{ marginTop: '20px' }}>
+              <h3>Cultures disponibles</h3>
+              <div
+                style={{
+                  maxHeight: '200px', // Hauteur maximale de la liste
+                  overflowY: 'auto', // Afficher la barre de défilement si nécessaire
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  padding: '10px',
+                }}
+              >
+                {crops.map((crop) => (
+                  <div
+                    key={crop.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '5px',
+                      backgroundColor: selectedCrop?.id === crop.id ? '#4CAF50' : 'transparent',
+                      color: selectedCrop?.id === crop.id ? 'white' : 'black',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setSelectedCrop(crop)}
+                  >
+                    <div style={{ fontSize: '24px', marginRight: '10px' }}>{crop.emoji}</div>
+                    <div>{crop.nom}</div>
                   </div>
-                </button>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>

@@ -573,6 +573,18 @@ def export_version(id):
         version = Version.query.get_or_404(id)
         version_data = version.to_dict()
         
+        # Récupérer les positions des parcelles
+        parcelle_positions = {}
+        positions = ParcellePosition.query.filter(ParcellePosition.parcelle_config_id.in_([p['id'] for p in version.parcelles])).all()
+        for position in positions:
+            parcelle_positions[position.parcelle_config_id] = {
+                'position_x': position.position_x,
+                'position_y': position.position_y
+            }
+        
+        # Inclure les positions dans les données exportées
+        version_data['parcelle_positions'] = parcelle_positions
+        
         # Nettoyer les données pour l'export
         if 'created_at' in version_data:
             version_data['created_at'] = version_data['created_at'].isoformat()
