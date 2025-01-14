@@ -253,17 +253,24 @@ function GardenPlanner() {
         ...prev,
         [parcelleId]: { row: newRow, col: newCol }
       }));
-
+  
       // Sauvegarder dans la base de données
       await axios.post('http://localhost:8001/parcelles/position', {
         parcelleId: parcelleId,
         x: newCol,
         y: newRow
       });
-
+  
+      // Recharger les données de la parcelle après le déplacement
+      const response = await axios.get(`http://localhost:8001/parcelles/${parcelleId}`);
+      setParcelleGrids(prev => ({
+        ...prev,
+        [parcelleId]: response.data.grid
+      }));
+  
       // Sélectionner automatiquement la parcelle après le drag & drop
       handleParcelleSelect(parcelleId);
-
+  
     } catch (error) {
       console.error('Erreur sauvegarde position:', error);
       setParcellePositions(prev => ({ ...prev }));
