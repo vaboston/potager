@@ -33,3 +33,4 @@ frontend/.cache
 # Exclure les fichiers système
 .DS_Store
 Thumbs.db
+alertes.py

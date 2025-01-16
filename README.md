@@ -31,8 +31,8 @@ Ce projet est une application de gestion de potager qui permet aux utilisateurs 
 1. Clonez le dépôt :
 
    ```bash
-   git clone https://github.com/votre-utilisateur/gestion-potager.git
-   cd gestion-potager
+   git clone https://github.com/vaboston/potager.git
+   cd potager
    ```
 
 2. Créez un environnement virtuel et activez-le :
